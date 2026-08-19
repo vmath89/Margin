@@ -115,7 +115,7 @@ The RFC states exactly what source and dialogue context the model receives, what
 
 ## M0-T03 — Align the architecture with the revised RFC
 
-**Status:** Ready
+**Status:** Done
 **Depends on:** M0-T01, M0-T02
 
 ### Outcome
