@@ -20,10 +20,11 @@ The system:
 
 1. extracts the text;  
 2. identifies chapters or sections where possible;  
-3. generates a short summary of the whole document;  
-4. generates a short summary for each chapter.
+3. creates a deterministic document map from extracted metadata and ordered section titles;
+4. generates and caches a short section synopsis only when a selected question context needs one.
 
-These summaries are stored and reused during reading.
+V0 does not generate or store a whole-document synopsis. The document map is orientation,
+not evidence that a particular claim appears in the source.
 
 ---
 
@@ -68,112 +69,76 @@ repeat before continuing.
 
 ---
 
-## **4\. Build the reasoning context**
+## **4\. Document-context contract**
 
-The reasoning model should not receive only the current paragraph.
+The reasoning model receives an explicit context package built by deterministic application
+logic. It never chooses passages, searches the document, or infers that unsupplied source
+text was retrieved. The anchored paragraph remains the episode's stable reading-position
+anchor; it is not the complete semantic context boundary.
 
-For most questions, it receives document, chapter, local-passage, recent-dialogue, and
-current-question context:
+Every package ends with the current question and may include the following layers:
 
-DOCUMENT CONTEXT  
-\- Title  
-\- Author, if available  
-\- Short document summary
+| Layer | Purpose | Contents and bound |
+| --- | --- | --- |
+| **Document orientation** | Identify the work and orient the explanation in its structure. It is not evidence for a precise textual claim. | Extracted title and author when available, document type, and an ordered document map of section titles. The map is limited by configured entry and character limits; omitted entries are marked as omitted. V0 stores this map, not a generated document synopsis. |
+| **Current-section context** | Explain how the passage relates to the current section. | Current section title plus a cached generated synopsis for local or limited book-wide questions. The synopsis has a configured maximum length and is generated only from that section's bounded source text. A whole-section question receives the complete current section instead, which must fit the configured section-context limit. |
+| **Local passage context** | Ground a passage-level explanation in immediate surrounding prose. | Up to two preceding ordered paragraphs, the unchanged anchored paragraph, and one following ordered paragraph, when those paragraphs exist. Paragraphs are included whole and in source order; configured paragraph limits are enforced during deterministic processing rather than by prompt-time truncation. |
+| **Recent dialogue** | Make a follow-up coherent within the paused conversational episode. | The newest complete question-and-answer turns from the active episode, excluding the current question. The builder keeps only whole turns that fit configured maximum turn and character budgets; it never includes turns from another episode. Persisted interactions outside that bounded selection are not model context. |
+| **Current question** | State the user's request. | The complete transcript for the current request, subject to a configured input limit that produces a clear error rather than silent truncation. |
 
-CHAPTER CONTEXT  
-\- Current chapter title  
-\- Short chapter summary
+The builder selects a scope by a simple, inspectable rule; it does not use a classifier or
+retrieval model:
 
-LOCAL CONTEXT  
-\- Previous 2–3 paragraphs  
-\- Current paragraph  
-\- Next paragraph
+- **Local passage** is the default. It contains document orientation, current-section
+  synopsis, local passage context, bounded recent dialogue, and the current question.
+- **Current section** is used only when the question explicitly asks about the section or
+  chapter as a whole. It contains document orientation, the full bounded current section,
+  bounded recent dialogue, and the current question.
+- **Limited book-wide** is used only when the question explicitly asks about the document
+  as a whole or where else something appears. It contains document orientation,
+  current-section synopsis, local passage context, bounded recent dialogue, and the
+  current question. It performs no book-wide search.
 
-RECENT DIALOGUE
-\- The most recent question-and-answer turns from the active conversational episode
+For every follow-up, the builder retains the original anchored paragraph and adds dialogue
+only from the same active episode. Pressing **Continue Reading** ends that episode; the
+next Ask starts a new episode with a new anchor and no previous episode dialogue.
 
-USER QUESTION
+### **Source authority and safe claims**
 
-The paragraph remains the episode's reading-position anchor throughout. The surrounding
-document, chapter, local-passage, and recent-dialogue context gives the model enough
-information to understand both the immediate passage and the larger argument.
+The uploaded PDF and the normalized text supplied in the selected context are authoritative.
+The model may say that the uploaded document states or implies something only when the
+supplied source text supports that statement. A generated section synopsis and the document
+map are orientation aids, not proof of a precise claim.
 
-Recent dialogue is bounded and temporary context assembled for the current model call;
-it is not long-term memory. Textual question-and-answer interactions may be persisted
-for the reading experience, but persistence does not make the entire history available
-to every future prompt.
+The model may use general knowledge about an identified work or subject only as clearly
+labeled background. Background knowledge must not be presented as evidence from the
+uploaded document and must never override supplied source text. The model must not claim
+that a passage, theme, or argument appears elsewhere in the uploaded document unless the
+builder supplied that evidence.
 
----
+### **Book-wide limitation shown to the user**
 
-## **Context Strategy**
+V0 has no full-document retrieval. For a question such as “Where else in the book does he
+discuss this?”, it must say that it can discuss the current passage and section but cannot
+verify other locations in the uploaded document. It may offer a clearly labeled
+best-effort interpretation from the supplied orientation, section, and local context; it
+must not present that interpretation as a search result. Full-document retrieval comes later.
 
-Keep the logic very simple in V0.
+### **Question-type walkthrough**
 
-For any follow-up in the active conversational episode, add bounded recent dialogue to
-the selected source context below. The original anchored paragraph remains unchanged
-until the user continues reading.
+The initial benchmark evaluates these five question types against the contract:
 
-### **If the user asks about the current passage**
+| Question type | Selected scope | Grounding rule |
+| --- | --- | --- |
+| Explain a passage | Local passage | Explain from the anchor and local window; use the section synopsis only for context. |
+| Author intent | Local passage by default | Describe intent as an interpretation of supplied wording and section context, not as an unsupported fact about the author. |
+| Give an example | Local passage by default | Label a model-created or general-knowledge example as illustrative, not source text. |
+| Follow-up connection | Same scope selected for the follow-up, plus bounded same-episode dialogue | Preserve the original anchor and distinguish a supported connection from background interpretation. |
+| Counterargument | Local passage by default | Separate the document's argument from a reasoned or background counterargument. |
 
-Examples:
-
-> “What does this mean?”
-
-> “Explain this paragraph.”
-
-> “Why is he saying this?”
-
-Send:
-
-Document summary  
-\+  
-Chapter summary  
-\+  
-Previous 2–3 paragraphs  
-\+  
-Current paragraph  
-\+  
-Next paragraph  
-\+  
-Bounded recent dialogue, when this is a follow-up in the active conversational episode
-\+
-User question  
----
-
-### **If the user asks about the whole chapter**
-
-Example:
-
-> “What is the overall argument of this chapter?”
-
-Send:
-
-Document summary  
-\+  
-Full current chapter  
-\+  
-Bounded recent dialogue, when this is a follow-up in the active conversational episode
-\+
-User question
-
-Assuming the chapter fits comfortably within the model context window.
-
----
-
-### **If the user asks about the whole book**
-
-Example:
-
-> “Where else in the book does he discuss this?”
-
-Proper book-wide retrieval is **out of scope for V0**.
-
-We can either tell the user this capability is limited or make a best-effort response from the document summary and current chapter.
-
-A follow-up retains the original anchored paragraph and may include bounded recent
-dialogue, but it does not add document retrieval capability.
-
-Full-document RAG comes later.
+This contract requires only ordered persisted source text, deterministic scope selection,
+and bounded prompt assembly. It requires no embeddings, vector database, semantic search,
+or hidden retrieval.
 
 ---
 
@@ -235,11 +200,13 @@ Identify chapters / sections
  ↓  
 Split into paragraphs  
  ↓  
-Generate document summary  
- ↓  
-Generate chapter summaries  
+Create document map
  ↓  
 Store
+
+Generate a short section synopsis lazily only when a local or limited book-wide question
+needs it, then reuse that bounded synopsis for the section. A whole-section question uses
+the bounded section text itself.
 
 No embeddings are required.
 
@@ -256,11 +223,11 @@ A document can initially look like:
 {  
   "title": "Letters from a Stoic",  
   "author": "Seneca",  
-  "summary": "...",  
+  "document_map": ["Letter I", "Letter II", "Letter III"],
   "chapters": \[  
     {  
       "title": "Letter I",  
-      "summary": "...",  
+      "cached_synopsis": "...",
       "paragraphs": \[  
         "...",  
         "...",  
@@ -296,14 +263,14 @@ DOCUMENT:
 {title}  
 {author}
 
-DOCUMENT CONTEXT:  
-{document\_summary}
+DOCUMENT ORIENTATION:
+{title, author if available, document type, bounded ordered document map}
 
 CURRENT CHAPTER:  
 {chapter\_title}
 
 CHAPTER CONTEXT:  
-{chapter\_summary}
+{cached\_section\_synopsis OR full bounded current section when section scope is selected}
 
 LOCAL CONTEXT:  
 {previous\_paragraphs}
@@ -328,6 +295,10 @@ When explaining a passage:
 \- clarify difficult phrases where relevant;  
 \- do not reduce a requested deep explanation to a short summary;  
 \- distinguish clearly between what the text says and your interpretation;  
+\- label general knowledge and invented examples as background or illustration;
+\- do not claim that unsupported material appears elsewhere in the uploaded document;
+\- for a book-wide question, state that full-document retrieval is unavailable and do not
+  present a best-effort interpretation as a search result;
 \- do not invent claims unsupported by the provided context.  
 ---
 
@@ -388,7 +359,7 @@ Store:
 documents  
 chapters  
 paragraphs  
-summaries  
+document maps and lazily cached section synopses
 reading position  
 conversation  
 textual question-and-answer interactions
@@ -449,7 +420,7 @@ V0 is done when I can:
 
 1. upload a PDF;  
 2. have the system identify its chapters;  
-3. have it create a document summary and chapter summaries;  
+3. have it create a document map and generate a bounded section synopsis only when needed;
 4. press **Read**;  
 5. listen to the document;  
 6. pause on a paragraph;  

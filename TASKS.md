@@ -78,7 +78,7 @@ The V0 RFC tests conversational reading rather than only a one-shot passage expl
 
 ## M0-T02 — Define the V0 document-context contract
 
-**Status:** Ready
+**Status:** Done
 **Depends on:** M0-T01
 
 ### Outcome
@@ -115,7 +115,7 @@ The RFC states exactly what source and dialogue context the model receives, what
 
 ## M0-T03 — Align the architecture with the revised RFC
 
-**Status:** Backlog  
+**Status:** Ready
 **Depends on:** M0-T01, M0-T02
 
 ### Outcome
@@ -152,7 +152,7 @@ The RFC states exactly what source and dialogue context the model receives, what
 
 ## M0-T04 — Select the initial development document and benchmark set
 
-**Status:** Backlog  
+**Status:** Ready
 **Depends on:** M0-T02
 
 ### Outcome
