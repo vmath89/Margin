@@ -152,7 +152,7 @@ The RFC states exactly what source and dialogue context the model receives, what
 
 ## M0-T04 — Select the initial development document and benchmark set
 
-**Status:** Ready
+**Status:** Done
 **Depends on:** M0-T02
 
 ### Outcome
@@ -188,7 +188,7 @@ Development and early evaluation use one representative, legally usable, text-ba
 
 ## M0-T05 — Approve the V0 baseline
 
-**Status:** Backlog  
+**Status:** Done
 **Depends on:** M0-T03, M0-T04
 
 ### Outcome
@@ -220,6 +220,22 @@ The product and engineering baseline is internally consistent and ready for impl
 - Complete a final cross-document review.
 - Trace one benchmark follow-up sequence from product requirement to architectural support.
 
+### Completion review
+
+- The Founding Thesis now explicitly distinguishes its long-term EPUB, article, learner-model,
+  and natural-interruption aspirations from V0's text-based-PDF, explicit-control loop.
+- The RFC now matches the architecture's V0 decisions: SQLite and one backend-only OpenRouter
+  gateway rather than interchangeable providers or PostgreSQL.
+- The core loop is consistently `Listen → Pause → Ask → Answer → Follow-up → Answer → Continue`:
+  a paragraph anchors the episode; the context builder supplies bounded same-episode dialogue;
+  Continue ends the episode and resumes at that anchor.
+- The explicit exclusions remain no retrieval, embeddings/vector storage, learner memory,
+  agents, real-time speech-to-speech, answer interruption, OCR, authentication, or
+  production-scale infrastructure.
+- Benchmark sequence S2 in `BENCHMARK.md` traces from the RFC episode contract to the
+  architecture's `ConversationEpisode`, ordered `Interaction` turns, bounded recent dialogue,
+  and Continue route.
+
 ---
 
 # M1 — Application foundation and capability validation
@@ -230,7 +246,7 @@ M1 begins after M0-T05. Capability spikes should resolve external uncertainty be
 
 ## M1-T01 — Define the repository layout and local developer workflow
 
-**Status:** Backlog  
+**Status:** Ready
 **Depends on:** M0-T05
 
 ### Outcome
@@ -554,7 +570,7 @@ The database represents the minimum V0 document, reading, interaction, and conve
 
 ### Scope
 
-- Add `Document`, `Section`, `Paragraph`, `Conversation`, and `Interaction` tables or the final M0-approved equivalents.
+- Add `Document`, `Section`, `Paragraph`, `ConversationEpisode`, and `Interaction` tables.
 - Add ordering, ownership, status, timestamps, and reading-position fields required by V0.
 - Add foreign keys and uniqueness constraints that enforce stable ordering and ownership.
 - Create the migration and focused persistence tests.

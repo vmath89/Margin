@@ -43,6 +43,10 @@ V0 succeeds when a user can:
 - One initial PDF and a benchmark question set are selected for development and evaluation.
 - Architecture invariants and the definition of done agree with the revised RFC.
 
+**Baseline approval:** M0-T05 confirms these criteria against the approved PDF and benchmark
+in `BENCHMARK.md`. V0 is a single-user, text-based-PDF product with explicit controls and a
+bounded same-episode conversation; its broader thesis aspirations remain deferred.
+
 ### M1 — Application foundation and capability validation
 
 **Outcome:** The web and API applications run locally, persist basic domain data, communicate through a stable boundary, and have verified seams for PDF extraction and model capabilities.

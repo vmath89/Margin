@@ -338,9 +338,9 @@ One simple screen is enough:
 
 ### **Reasoning**
 
-One strong reasoning model.
-
-Keep the provider interchangeable.
+One strong reasoning model through the backend's single OpenRouter gateway. Model IDs are
+configuration, but V0 does not add provider interchangeability, routing, or provider-specific
+credentials.
 
 ### **Speech input**
 
@@ -352,7 +352,7 @@ High-quality TTS API.
 
 ### **Storage**
 
-SQLite or Postgres is enough for V0.
+SQLite is the V0 database.
 
 Store:
 

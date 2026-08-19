@@ -73,6 +73,9 @@ The fundamental interaction becomes:
 
 **Listen → Interrupt → Understand → Discuss → Continue.**
 
+V0 implements that interaction as **Listen → Pause → Ask → Answer → Follow-up → Answer →
+Continue**.
+
 A person walking to work could listen to a chapter of a philosophy book.
 
 They say:
@@ -175,6 +178,12 @@ Our job is to collapse that workflow into one experience.
 # **The product**
 
 The product should initially be extremely simple.
+
+For V0, that means one supported, text-based PDF in a trusted single-user web application.
+The reader explicitly presses **Ask** after pausing; it supports a bounded spoken
+conversation anchored to that paragraph and resumes only when the reader presses
+**Continue**. EPUBs, articles, persistent reader knowledge, and more natural interruption
+mechanisms remain part of the longer-term direction, not V0 requirements.
 
 ### **Upload or open something.**
 
@@ -399,4 +408,3 @@ AI gives us the ability to place a patient, knowledgeable teacher beside every p
 We believe that once people experience knowledge this way, a significant portion of long-form learning will move from passive reading toward **interactive, personalized conversation**.
 
 **We want to build the interface through which that happens.**
-
