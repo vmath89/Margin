@@ -4,7 +4,7 @@
 
 Build the **smallest web application** that proves this interaction:
 
-> **Upload a document → listen → pause → ask a question → hear a detailed AI answer → continue.**
+> **Upload a document → listen → pause → ask → hear an answer → ask follow-ups → continue.**
 
 The purpose of V0 is to validate whether this experience is compelling before building agents, long-term memory, sophisticated RAG, mobile apps, or personalization.
 
@@ -58,7 +58,13 @@ For example:
 
 Speech is converted to text.
 
-The system records the paragraph where the user stopped.
+The system records the paragraph where the user stopped. That paragraph is the stable
+reading-position anchor: it determines where narration resumes, but it is not the
+complete semantic context for the question.
+
+Asking begins a **conversational episode**. Reading remains paused while that episode
+is active. The user can hear the answer, ask a follow-up, hear another answer, and
+repeat before continuing.
 
 ---
 
@@ -66,7 +72,8 @@ The system records the paragraph where the user stopped.
 
 The reasoning model should not receive only the current paragraph.
 
-For most questions, it receives four layers of context:
+For most questions, it receives document, chapter, local-passage, recent-dialogue, and
+current-question context:
 
 DOCUMENT CONTEXT  
 \- Title  
@@ -82,15 +89,29 @@ LOCAL CONTEXT
 \- Current paragraph  
 \- Next paragraph
 
+RECENT DIALOGUE
+\- The most recent question-and-answer turns from the active conversational episode
+
 USER QUESTION
 
-This gives the model enough context to understand both the immediate passage and the larger argument.
+The paragraph remains the episode's reading-position anchor throughout. The surrounding
+document, chapter, local-passage, and recent-dialogue context gives the model enough
+information to understand both the immediate passage and the larger argument.
+
+Recent dialogue is bounded and temporary context assembled for the current model call;
+it is not long-term memory. Textual question-and-answer interactions may be persisted
+for the reading experience, but persistence does not make the entire history available
+to every future prompt.
 
 ---
 
 ## **Context Strategy**
 
 Keep the logic very simple in V0.
+
+For any follow-up in the active conversational episode, add bounded recent dialogue to
+the selected source context below. The original anchored paragraph remains unchanged
+until the user continues reading.
 
 ### **If the user asks about the current passage**
 
@@ -114,6 +135,8 @@ Current paragraph
 \+  
 Next paragraph  
 \+  
+Bounded recent dialogue, when this is a follow-up in the active conversational episode
+\+
 User question  
 ---
 
@@ -129,6 +152,8 @@ Document summary
 \+  
 Full current chapter  
 \+  
+Bounded recent dialogue, when this is a follow-up in the active conversational episode
+\+
 User question
 
 Assuming the chapter fits comfortably within the model context window.
@@ -144,6 +169,9 @@ Example:
 Proper book-wide retrieval is **out of scope for V0**.
 
 We can either tell the user this capability is limited or make a best-effort response from the document summary and current chapter.
+
+A follow-up retains the original anchored paragraph and may include bounded recent
+dialogue, but it does not add document retrieval capability.
 
 Full-document RAG comes later.
 
@@ -175,21 +203,23 @@ The generated answer is also displayed on screen.
 
 The AI response is read aloud.
 
-For V0, the user does **not** need to interrupt the explanation with another question.
-
-That can come later.
+For V0, the user does **not** need to interrupt an answer while it is playing. That can
+come later. After the answer finishes, the user may ask a follow-up while reading
+remains paused. The follow-up stays in the same conversational episode, uses the
+original anchored paragraph as its reading position, and receives bounded recent dialogue
+as additional context.
 
 ---
 
 ## **7\. Continue reading**
 
-After the explanation, the user presses:
+After one or more answers, the user presses:
 
 **▶ Continue Reading**
 
-The document resumes from the paragraph where they stopped.
-
-Exact sentence-level semantic resume is not required yet.
+The document resumes from the original paragraph where they stopped. Continuing ends
+the active conversational episode; a later Ask begins a new one at the then-current
+paragraph. Exact sentence-level semantic resume is not required yet.
 
 ---
 
@@ -247,6 +277,11 @@ The reading session only needs to remember:
   "chapter\_index": 3,  
   "paragraph\_index": 12  
 }  
+
+While reading is paused, an active conversational episode additionally has one anchored
+paragraph and an ordered set of textual question-and-answer interactions. The episode
+ends when the user continues reading. Recent turns are selected from that episode only
+as bounded temporary reasoning context.
 ---
 
 # **Prompt Structure**
@@ -278,6 +313,9 @@ CURRENT PARAGRAPH:
 
 NEXT PARAGRAPH:  
 {next\_paragraph}
+
+RECENT DIALOGUE:
+{bounded\_recent\_question\_and\_answer\_turns\_from\_this\_episode}
 
 USER QUESTION:  
 {question}
@@ -353,6 +391,7 @@ paragraphs
 summaries  
 reading position  
 conversation  
+textual question-and-answer interactions
 ---
 
 # **Explicitly Not Building Yet**
@@ -364,13 +403,15 @@ V0 does **not** include:
 * embeddings;  
 * vector databases;  
 * full-document RAG;  
-* long-term learner memory;  
+* long-term conversation or learner memory;
 * personalized knowledge graphs;  
 * external web research;  
 * cross-book connections;  
 * native mobile apps;  
 * Kindle integration;  
-* publisher integrations.
+* publisher integrations;
+* interruption while an AI answer is playing;
+* wake words, voice activity detection, or streaming speech-to-speech.
 
 The only intelligence beyond basic prompting is the **hierarchical document context**.
 
@@ -396,7 +437,7 @@ Is it easier to stay with difficult material when questions can be asked without
 
 Does:
 
-> **Listen → Pause → Ask → Understand → Continue**
+> **Listen → Pause → Ask → Answer → Follow-up → Answer → Continue**
 
 feel substantially better than manually switching between a reader and ChatGPT?
 
@@ -417,12 +458,13 @@ V0 is done when I can:
    **“Explain this entire paragraph to me in detail.”**  
 9. receive an explanation that understands both the paragraph and the chapter context;  
 10. hear that explanation naturally;  
-11. press **Continue**;  
-12. keep listening.
+11. ask at least one follow-up question while reading remains paused;
+12. receive and hear a follow-up answer that uses the original anchored passage and recent dialogue;
+13. press **Continue**;
+14. keep listening from the original anchored paragraph.
 
 At that point, stop building features and use the product on a real difficult book.
 
 The central MVP principle is:
 
 > **Give the model enough context to understand the text deeply, but do not build retrieval infrastructure until real usage proves that we need it.**
-

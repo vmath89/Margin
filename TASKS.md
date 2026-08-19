@@ -41,7 +41,7 @@ A documentation or research ticket is done when its stated artifact exists, inco
 
 ## M0-T01 — Revise the RFC around conversational episodes
 
-**Status:** Ready  
+**Status:** Done
 **Depends on:** None
 
 ### Outcome
@@ -78,7 +78,7 @@ The V0 RFC tests conversational reading rather than only a one-shot passage expl
 
 ## M0-T02 — Define the V0 document-context contract
 
-**Status:** Backlog  
+**Status:** Ready
 **Depends on:** M0-T01
 
 ### Outcome
