@@ -34,6 +34,8 @@ V0 succeeds when a user can:
 
 ### M0 — Product and architecture alignment
 
+**Status:** Complete (`M0-T01` through `M0-T08` are Done.)
+
 **Outcome:** The thesis, RFC, and architecture describe the same V0 product and define a testable conversational experience.
 
 **Exit criteria:**
@@ -45,6 +47,8 @@ V0 succeeds when a user can:
   without implying false document knowledge or retrieval.
 - One initial PDF and a benchmark question set are selected for development and evaluation.
 - Architecture invariants and the definition of done agree with the revised RFC.
+- A reader can deterministically resume, start at the beginning, or start at any ordered detected
+  or fallback section without compromising session dialogue or episode anchors.
 
 **Baseline approval:** M0-T05 confirms these criteria against the approved PDF and benchmark
 in `BENCHMARK.md`. V0 is a single-user, text-based-PDF product with explicit controls and a
@@ -52,8 +56,11 @@ persisted reading-session conversation spanning multiple pause episodes. M0-T06 
 original same-episode-only context boundary; cross-session learner memory remains deferred.
 M0-T07 adds a bounded canonical full-document scope for explicit document-wide questions and
 retains a clearly disclosed limited mode when the complete candidate prompt does not fit.
+M0-T08 adds deterministic start and flat section navigation; richer navigation remains deferred.
 
 ### M1 — Application foundation and capability validation
+
+**Status:** Ready to begin (`M1-T01` is Ready.)
 
 **Outcome:** The web and API applications run locally, persist basic domain data, communicate through a stable boundary, and have verified seams for PDF extraction and model capabilities.
 
@@ -65,34 +72,62 @@ retains a clearly disclosed limited mode when the complete candidate prompt does
 - The initial document, section, paragraph, reading-session, conversational-episode, and interaction schema exists.
 - Application services can use deterministic fake reasoning, transcription, and speech operations.
 - Focused spikes verify the selected PDF, STT input format, TTS output, and reasoning context outside the product flow.
+- The reasoning spike exercises local, current-section, fitting full-document, and over-budget
+  limited document-wide contexts, including same-session dialogue and deterministic prompt-budget
+  behavior.
+- Initial context-budget, answer-reserve, safety-margin, recording, and audio-cache configuration
+  requirements are documented from measured capability behavior rather than page-count guesses.
 - Automated checks run through a documented verification command or procedure.
 
 ### M2 — PDF reader and narration
 
-**Outcome:** A user can upload the selected supported PDF, listen paragraph by paragraph, pause, navigate backward, and resume from a persisted anchor.
+**Status:** Not started; decompose near M1 completion.
+
+**Outcome:** A user can upload the selected supported PDF, choose where to begin, listen paragraph by paragraph, pause, navigate by section or backward, and resume from a persisted anchor.
 
 **Exit criteria:**
 
 - Upload and processing states are visible.
 - Extracted sections and paragraphs remain ordered and lossless.
+- Before narration, the user can resume the saved paragraph, start at the beginning, or select any
+  ordered detected or fallback section.
+- Every selectable section exposes a stable ID, title, order, and first paragraph ID; invalid or
+  cross-document selections fail clearly.
 - The active paragraph is displayed and highlighted.
 - Paragraph audio is generated on demand and the next paragraph is prefetched.
-- Pause, previous paragraph, playback speed, and resume work.
+- Pause, previous paragraph, playback speed, section navigation, and resume work.
+- Selecting a new section pauses narration and persists that section's first paragraph as the new
+  reading position without creating a second source order or navigation model.
 - Reading position survives a page reload.
 
 ### M3 — Grounded question and answer
 
-**Outcome:** A user can pause narration, ask one spoken question about the anchored passage, see and hear a grounded answer, and continue reading.
+**Status:** Not started; decompose near M2 completion.
+
+**Outcome:** A user can pause narration, ask one spoken question at local, section, or document-wide scope, see and hear a grounded answer, and continue reading.
 
 **Exit criteria:**
 
 - Browser audio is recorded and transcribed.
-- Context includes document orientation, current-section context, a local passage window, all earlier dialogue from the active reading session, and the question.
+- Scope selection is explicit, deterministic, and testable without a classifier or retrieval call.
+- Local questions receive document orientation, current-section synopsis, the canonical local
+  passage window, complete earlier active-session dialogue, and the current question.
+- Current-section questions receive the complete bounded current section rather than an unused
+  synopsis or duplicated local source context.
+- Explicit document-wide questions receive the complete canonical document exactly once when the
+  exact prompt fits the configured budget; otherwise they receive clearly disclosed limited
+  document-wide context that does not imply complete-document analysis.
+- Source and session dialogue are never silently truncated, sampled, duplicated, overlapped, or
+  reordered to make a prompt fit.
+- The uploaded source remains authoritative; prior model answers, section synopses, document maps,
+  and general knowledge do not become unsupported source evidence.
 - The textual interaction is stored exactly once.
 - Answer audio is generated separately and can be retried.
 - Continue resumes from the recorded paragraph.
 
 ### M4 — Session-continuous conversational reading
+
+**Status:** Not started; decompose near M3 completion.
 
 **Outcome:** The user can converse while paused, continue reading, and later begin a new anchored conversation that remembers every earlier discussion from the same reading session.
 
@@ -104,37 +139,40 @@ retains a clearly disclosed limited mode when the complete candidate prompt does
 - A context-limit failure is explicit and never silently drops or summarizes an earlier session turn.
 - The user can ask, hear an answer, ask again, and then continue.
 - Continuing closes the active conversational episode without ending the reading session.
+- After Continue, backward movement, or section navigation, the next Ask creates a new episode with
+  the newly selected immutable paragraph anchor while retaining every earlier interaction from the
+  active reading session.
+- Navigation cannot mutate the anchor of an active conversational episode; that episode must end
+  before the reading position changes.
 - The benchmark same-episode and cross-episode questions produce coherent, grounded responses.
 
 ### M5 — V0 hardening and dogfooding
+
+**Status:** Not started; decompose near M4 completion.
 
 **Outcome:** The complete V0 loop is reliable enough for repeated use on a real difficult document and produces evidence for V1 prioritization.
 
 **Exit criteria:**
 
-- The end-to-end happy path is covered by a browser test using fake model operations.
+- The end-to-end browser test using fake model operations covers upload, start-location selection,
+  narration, pause, Ask, answer playback, same-episode follow-up, Continue, navigation to a new
+  anchor, a later session-aware Ask, and resume.
+- Deterministic tests cover local, section, fitting full-document, and over-budget limited
+  document-wide scope behavior, including exact source ordering and context-limit failures.
 - Important processing, network, and model failures have clear retry behavior.
 - Logs and diagnostics avoid storing full sensitive passages or audio.
+- Benchmark cases B1–B7 and S1–S3 are exercised against the implemented context contract, with live
+  provider checks remaining explicit and opt-in.
 - The product is used in several real reading sessions.
-- Observed failures, latency, answer quality, and desired capabilities are recorded.
+- Observed failures, latency, cost, answer quality, navigation friction, context-limit frequency,
+  and desired capabilities are recorded.
 - V1 work is selected from evidence rather than assumed in advance.
 
 ## Future idea stash — post-V0/V2 candidates
 
-These ideas remain visible for later planning but are not V0 commitments. Promote them into a
-milestone only when real use supplies evidence for their priority.
-
-- Full-document retrieval/RAG and vector search beyond bounded canonical full-document context.
-- Retrieval or summarization over ended reading-session transcripts.
-- Automatic compaction of a long active session while preserving important distinctions and user intent.
-- Cross-document connections, learner memory, and personalized explanation history.
-- Autonomous or multi-agent orchestration.
-- Real-time speech-to-speech interaction.
-- Interrupting an answer while it is playing.
-- Sentence-level audio alignment and resume.
-- OCR and broad support for malformed or image-only PDFs.
-- Authentication, multi-user isolation, billing, and production-scale infrastructure.
-- Native mobile, EPUB, Kindle, and publisher integrations.
+`FUTURE_IDEAS.md` is the source of truth for deferred concepts and their evidence-based revisit
+conditions. Entries there are not roadmap commitments and cannot be implemented until an explicit
+decision promotes them into this roadmap and creates actionable work in `TASKS.md`.
 
 ## Planning horizon
 

@@ -11,6 +11,7 @@ Read these product documents before making product or architectural changes:
 3. `ARCHITECTURE.md` — technical design and invariants.
 4. `ROADMAP.md` — milestone outcomes and exit criteria.
 5. `TASKS.md` — active backlog, ticket scope, and acceptance criteria.
+6. `FUTURE_IDEAS.md` — deferred concepts that are not approved or authorized work.
 
 If these documents disagree, do not silently choose one. Treat the thesis as product direction, the RFC as V0 product scope, and the architecture as its implementation design. Resolve material inconsistencies in the relevant planning documents before implementation.
 
@@ -29,6 +30,8 @@ M0 aligns the product and architecture. M1 establishes the application foundatio
 - Keep one implementation ticket in progress unless independent parallel work is explicitly requested.
 - Stay within the ticket's scope and out-of-scope boundaries.
 - Add newly discovered work to the backlog instead of expanding the active ticket silently.
+- Record a worthwhile out-of-scope product idea in `FUTURE_IDEAS.md`; do not implement it unless an
+  explicit decision promotes it into `ROADMAP.md` and `TASKS.md`.
 - Mark a ticket `Done` only after every acceptance criterion and verification step passes.
 - Update ticket status in the same change that completes the ticket.
 - Do not mark a milestone complete until its integrated exit criteria in `ROADMAP.md` are demonstrable.
@@ -39,6 +42,9 @@ Preserve these principles unless an approved RFC change says otherwise:
 
 - The central experience is `Listen → Pause → Ask → Discuss → Continue`.
 - A paragraph is the stable reading-position and resume anchor, not the full semantic context boundary.
+- Before narration, a reader may resume the saved paragraph, start at the document beginning, or
+  select an ordered detected or fallback section. Navigation within an active session preserves
+  its dialogue but requires any active conversational episode to end before the position changes.
 - Model context is explicit, bounded, grounded, and constructed by application logic.
 - Sequential follow-up questions belong to one paused-reading conversational episode.
 - A reading session spans narration and multiple conversational episodes. Every complete earlier

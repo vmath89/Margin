@@ -68,11 +68,25 @@ These conservative character limits keep behavior easy to test across OpenRouter
 
 ### Listen
 
-1. The web app creates or resumes the document's active `ReadingSession`, then loads the document's `current_paragraph_id` and requests that paragraph with nearby paragraphs. A reading session remains active across Continue operations and page reloads until the user explicitly ends it or starts a new one.
+1. Before narration, the web app creates or resumes the document's active `ReadingSession` with one
+   explicit start selection: `resume`, `beginning`, or an ordered `section_id`. The document
+   response supplies each section's stable ID, title, order, and first paragraph ID, including
+   fallback sections. `resume` keeps the document's saved `current_paragraph_id`; `beginning`
+   saves the document's first ordered paragraph; and `section_id` deterministically saves that
+   section's first paragraph. FastAPI verifies that every requested section and paragraph belongs
+   to the document before saving the position, then returns the selected reader window. A reading
+   session remains active across Continue operations and page reloads until the user explicitly
+   ends it or starts a new one.
 2. It requests MP3 narration for the current paragraph. FastAPI serves an existing file or generates it through OpenRouter TTS and saves it at a predictable path containing the TTS configuration version and paragraph ID.
 3. The browser plays one paragraph at a time, highlights it, and prefetches the next paragraph's audio.
 4. On paragraph transition, pause, or skip, the browser saves the current paragraph ID on the document.
 5. Playback speed is browser state. Skip backward selects the previous ordered paragraph, including across a section boundary.
+
+The reader may also navigate an active session to the beginning or a section. It pauses narration,
+validates the document-owned selection, and updates `Document.current_paragraph_id` without ending
+the reading session or removing its interactions. Navigation is rejected while that session has an
+active `ConversationEpisode`; the reader must first use Continue to end the episode at its
+immutable anchor. A subsequent Ask creates a new episode anchored at the navigated paragraph.
 
 Paragraph is the synchronization unit for highlighting and resume. Pausing midway through a paragraph resumes from the beginning of that paragraph; sentence-level alignment is out of scope.
 
@@ -108,7 +122,8 @@ Responsibilities:
 - record a bounded `audio/webm` question;
 - manage paragraph and answer audio playback;
 - highlight the paragraph currently being narrated;
-- expose play, pause, previous paragraph, playback speed, ask, and continue controls;
+- expose resume, start-at-beginning, and ordered-section start choices, plus play, pause, previous
+  paragraph, playback speed, ask, continue, and active-session navigation controls;
 - create, resume, and explicitly end a reading session;
 - persist paragraph changes through FastAPI.
 
@@ -129,12 +144,12 @@ The V0 API surface is:
 | Method and path | Purpose | Main response |
 |---|---|---|
 | `POST /api/documents` | Upload a PDF and start processing | Document ID and status |
-| `GET /api/documents/{id}` | Poll status or load metadata and position | Document, status/error, current paragraph ID |
+| `GET /api/documents/{id}` | Poll status or load metadata, position, and selectable sections | Document, status/error, current paragraph ID, ordered `{ id, title, order, first_paragraph_id }` sections |
 | `POST /api/documents/{id}/retry` | Retry a failed processing run | Updated document status |
-| `POST /api/documents/{id}/sessions` | Create or resume the active reading session | Reading session ID and status |
+| `POST /api/documents/{id}/sessions` | Create or resume the active reading session and select `resume`, `beginning`, or `section_id` | Reading session ID, status, and saved paragraph ID |
 | `POST /api/documents/{id}/sessions/{session_id}/end` | Explicitly end the active reading session | Ended reading session |
 | `GET /api/documents/{id}/reader?paragraph_id=...` | Load the selected paragraph and nearby ordered paragraphs | Reader window with stable paragraph IDs |
-| `PUT /api/documents/{id}/position` | Save `{ paragraph_id }` | Saved paragraph ID |
+| `PUT /api/documents/{id}/position` | Navigate an active session with exactly one of `{ paragraph_id }`, `{ beginning: true }`, or `{ section_id }` | Saved paragraph ID; rejects invalid/cross-document selections and an active episode |
 | `GET /api/paragraphs/{id}/audio` | Get or generate paragraph narration | `audio/mpeg` |
 | `POST /api/documents/{id}/interactions` | Start or continue the active session's conversational episode with question audio; produce transcript plus textual answer | Stored interaction, session ID, and episode ID |
 | `POST /api/documents/{id}/episodes/{episode_id}/continue` | End the active episode and resume at its anchor | Ended episode and anchored paragraph ID |
@@ -148,7 +163,17 @@ The original PDF is retained. All derived section and paragraph rows are committ
 
 ### Reading and question functions
 
-Reading functions create or resume a reading session, load ordered paragraphs, save position, and generate paragraph audio. Question functions create or validate the single active episode within that session, transcribe audio, select the explicit scope rule, lazily generate the current-section synopsis when the selected context needs it, build bounded context with all earlier session interactions, request an answer, and store the ordered interaction. Continue functions end only the matching episode and restore its anchor as the document's reading position. Ending a reading session is a separate explicit operation.
+Reading functions create or resume a reading session, select a saved, beginning, or section-first
+paragraph, load ordered paragraphs, save position, and generate paragraph audio. Section selection
+uses the persisted ordered section list, including fallback sections, and returns stable IDs,
+titles, order, and first paragraph IDs to the reader. Mid-session navigation pauses playback and
+updates the position only when no episode is active; it retains the session and all its
+interactions. Question functions create or validate the single active episode within that session,
+transcribe audio, select the explicit scope rule, lazily generate the current-section synopsis when
+the selected context needs it, build bounded context with all earlier session interactions, request
+an answer, and store the ordered interaction. Continue functions end only the matching episode and
+restore its anchor as the document's reading position. Ending a reading session is a separate
+explicit operation.
 
 The context builder is pure application logic: persisted domain data, the active reading session, its active episode, and a question produce an explicit scope and model input. It selects only whole source paragraphs and includes every complete earlier session turn in deterministic episode and turn order; it never queries beyond the RFC's selected source layers. The OpenRouter integration cannot query the database or choose passages.
 
@@ -177,13 +202,13 @@ SQLite runs in WAL mode. Exactly one backend process may write to it or execute 
 | Object | Important fields |
 |---|---|
 | `Document` | ID, title, author, document type, bounded ordered document map, source path, status, failure code/message, current paragraph ID, timestamps |
-| `Section` | ID, document ID, order, title, boundary source (`outline`, `heading`, or `fallback`), nullable cached synopsis, synopsis prompt version/model ID, start/end page |
+| `Section` | ID, document ID, order, title, boundary source (`outline`, `heading`, or `fallback`), first paragraph ID (derived from ordered member paragraphs for navigation responses), nullable cached synopsis, synopsis prompt version/model ID, start/end page |
 | `Paragraph` | ID, section ID, order, text, start/end page |
 | `ReadingSession` | ID, document ID, status (`active` or `ended`), started time, ended time |
 | `ConversationEpisode` | ID, reading session ID, session order, anchored paragraph ID, status (`active` or `ended`), started time, ended time |
 | `Interaction` | ID, episode ID, turn order, question transcript, answer text, context scope, prompt version, OpenRouter model ID, created time |
 
-There is at most one active `ReadingSession` per document and at most one active `ConversationEpisode` per reading session. `ConversationEpisode.session_order` is unique and ascending within its session; `Interaction.turn_order` is unique and ascending within its episode. The pair gives every complete session turn a deterministic chronological order. `ConversationEpisode.anchored_paragraph_id` must belong to its session's document. Foreign keys are not duplicated when they can be derived: a paragraph determines its section and document, and an interaction determines its session, anchored paragraph, section, and document through its episode. `current_paragraph_id` lives on `Document` because there is one user and one reading position per document.
+There is at most one active `ReadingSession` per document and at most one active `ConversationEpisode` per reading session. `ConversationEpisode.session_order` is unique and ascending within its session; `Interaction.turn_order` is unique and ascending within its episode. The pair gives every complete session turn a deterministic chronological order. `ConversationEpisode.anchored_paragraph_id` must belong to its session's document. A selectable section's first paragraph is the lowest-order paragraph in that section and must belong to the section's document. Foreign keys are not duplicated when they can be derived: a paragraph determines its section and document, and an interaction determines its session, anchored paragraph, section, and document through its episode. `current_paragraph_id` lives on `Document` because there is one user and one reading position per document.
 
 Persist the original PDF, normalized sections and paragraphs, the bounded document map, lazily cached section synopses, processing errors, reading position, reading sessions, episodes, and textual interactions. Do not persist a whole-document or paragraph summary. The question recording is deleted after successful transcription and may also be deleted after a failed request once its error has been returned.
 
@@ -257,7 +282,7 @@ PDF parsing uses `pypdf` only for metadata and outline destinations and `pdfplum
 
 ### Testing approach
 
-- Unit-test nested-outline flattening, heading detection, paragraph reconstruction, deterministic document-map bounds and omission markers, bounded fallback sections, no-loss/no-overlap ordering, canonical full-document serialization and markers, deterministic full-prompt budget calculation (including instructions, answer reserve, safety margin, complete dialogue, and question), scope rules and limited fallback disclosures, lazy section-synopsis caching, reading-session and episode lifecycle, chronological interaction ordering, whole-session context limits, prior-knowledge prompt guardrails, and audio paths as pure logic.
+- Unit-test nested-outline flattening, heading detection, paragraph reconstruction, deterministic document-map bounds and omission markers, bounded fallback sections, no-loss/no-overlap ordering, ordered selectable-section serialization and first-paragraph resolution, document-owned navigation validation, rejection while an episode is active, canonical full-document serialization and markers, deterministic full-prompt budget calculation (including instructions, answer reserve, safety margin, complete dialogue, and question), scope rules and limited fallback disclosures, lazy section-synopsis caching, reading-session and episode lifecycle, chronological interaction ordering, whole-session context limits, prior-knowledge prompt guardrails, and audio paths as pure logic.
 - Test processing state transitions and query functions against a temporary SQLite database, including interrupted processing and retry without duplicate rows.
 - Replace the three OpenRouter operations with fakes for service and API tests. Keep a small opt-in live OpenRouter smoke test for each configured model.
 - Store small legal PDF fixtures for bookmarks, no bookmarks, long text blocks, and no extractable text.
@@ -299,3 +324,6 @@ PDF parsing uses `pypdf` only for metadata and outline destinations and `pdfplum
 16. Dialogue from an ended or different reading session never enters model context.
 17. Full-document eligibility is a deterministic exact-candidate-prompt calculation that reserves configured answer capacity and safety margin; it includes all complete active-session dialogue and never makes a document fit by omitting, truncating, sampling, or summarizing source or dialogue.
 18. Limited document-wide context explicitly identifies its supplied layers and does not claim complete-document analysis; document-wide location claims require supplied canonical complete source.
+19. Before narration, start selection is limited to the saved position, document beginning, or a
+    persisted ordered section's first paragraph. Active-session navigation preserves session
+    dialogue but is rejected until any active episode ends; it never mutates that episode's anchor.

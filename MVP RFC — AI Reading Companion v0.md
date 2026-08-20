@@ -43,6 +43,13 @@ session spans narration and every pause-and-discuss episode until the user expli
 session or starts a new one. Pressing **Continue Reading** does not end the reading session, and
 a page reload does not silently discard it.
 
+Before narration begins, the reader chooses one of three deterministic starts: **Resume** from the
+saved paragraph, **Start at beginning** from the document's first paragraph, or **Choose section**
+from the document's flat ordered section list. Each selectable section exposes its stable ID,
+title, source order, and first paragraph ID. Detected chapters and deterministic fallback sections
+use the same list and behavior. Choosing the beginning or a section saves its resolved paragraph as
+the document's current reading position before narration starts.
+
 Basic controls:
 
 * Play  
@@ -133,6 +140,14 @@ Within one episode, every follow-up retains that episode's original anchored par
 **Continue Reading** ends the episode but not the reading session. A later Ask in the same reading
 session creates a new episode with a new anchor and still receives every complete earlier turn
 from that reading session. Dialogue from an ended reading session is not included in a new one.
+
+While a reading session is active, the reader may navigate to the document beginning or an ordered
+section. The application pauses narration, validates that the requested section and resolved first
+paragraph belong to the current document, and saves that paragraph as the current reading position.
+It retains every earlier interaction in the reading session. Navigation is unavailable while a
+conversational episode is active: the reader must first press **Continue Reading**, which ends the
+episode at its immutable anchor. The subsequent Ask creates a new episode anchored at the navigated
+paragraph. Invalid, missing, or cross-document selections fail clearly.
 
 ### **Source authority and safe claims**
 
@@ -265,7 +280,7 @@ No sophisticated retrieval system is required.
 
 A document can initially look like:
 
-{  
+{
   "title": "Letters from a Stoic",  
   "author": "Seneca",  
   "document_map": ["Letter I", "Letter II", "Letter III"],
@@ -284,7 +299,7 @@ A document can initially look like:
 
 The active reading session remembers:
 
-{  
+{
   "reading_session_id": "session_1",
   "document\_id": "doc\_1",  
   "chapter\_index": 3,  
@@ -297,6 +312,19 @@ episode but retains it inside the active reading session. Every later reasoning 
 same reading session receives all complete interactions from all of its episodes in chronological
 order. If the whole required prompt no longer fits the configured limit, V0 asks the user to start
 a new session rather than silently omitting or summarizing earlier turns.
+
+The document exposes its flat ordered selectable sections separately from the document map:
+
+{
+  "sections": [
+    { "id": "section_1", "title": "Letter I", "order": 1, "first_paragraph_id": "paragraph_1" },
+    { "id": "section_2", "title": "Section 2", "order": 2, "first_paragraph_id": "paragraph_18" }
+  ]
+}
+
+`Section 2` above is a deterministic fallback section; it is selectable exactly like a detected
+chapter. This navigation list is for choosing a known ordered location, not semantic search or
+evidence for source claims.
 ---
 
 # **Prompt Structure**
@@ -379,6 +407,11 @@ One simple screen is enough:
 ├───────────────────────────────────────────────────────┤  
 │        ⏪        ▶ / ⏸        🎙 Ask        1×         │  
 └───────────────────────────────────────────────────────┘  
+
+Before the reader view begins, the screen also presents **Resume**, **Start at beginning**, and a
+flat ordered section picker. During an active reading session, selecting the beginning or a section
+first pauses narration; it is disabled while a conversational episode is active and becomes
+available after Continue ends that episode.
 ---
 
 # **Tech Stack**
@@ -495,6 +528,8 @@ V0 is done when I can:
 16. ask a question that refers to the earlier conversation;
 17. receive an answer that uses the complete earlier session dialogue while grounding new source
     claims in the newly anchored passage and its selected context.
+18. start or navigate the active session at the document beginning or any ordered section without
+    losing earlier session dialogue or mutating an active episode's anchor.
 
 At that point, stop building features and use the product on a real difficult book.
 

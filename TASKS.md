@@ -384,22 +384,110 @@ an unsupported claim of whole-document analysis.
   over-limit capability profile. Full-document retrieval/RAG, embeddings, vector storage, and
   hidden retrieval remain deferred.
 
+## M0-T08 — Add section-based reading start and navigation
+
+**Status:** Done
+**Depends on:** M0-T07
+
+### Outcome
+
+V0 lets the user begin or resume a reading session from a meaningful place in the document rather
+than forcing every session to start at the first paragraph.
+
+### Scope
+
+- Add three start choices: resume the saved position, start at the document beginning, or choose an
+  ordered chapter/section.
+- Use detected sections and deterministic fallback sections through the same navigation contract.
+- Define each selectable section by stable identity, title, order, and first paragraph ID.
+- Define session-start behavior when the user selects a section or the beginning.
+- Define navigation during an active reading session: pause narration, update the saved reading
+  position, retain active-session dialogue, and anchor the next conversational episode at the new
+  location.
+- Preserve an active conversational episode's immutable paragraph anchor by requiring that episode
+  to end before document navigation changes the reading position.
+- Validate that every selected section and paragraph belongs to the current document.
+- Align the RFC, architecture, roadmap, later milestone expectations, backlog dependencies, and
+  engineering instructions.
+- Record deferred advanced navigation ideas in `FUTURE_IDEAS.md`.
+
+### Out of scope
+
+- Semantic navigation such as “take me to the discussion of monetary policy.”
+- Full-text search, arbitrary phrase lookup, or arbitrary sentence-level positioning.
+- Bookmarks, highlights, annotations, or saved named locations.
+- Page thumbnails or a sophisticated nested table of contents.
+- Voice-controlled navigation.
+- Automatically choosing the best place for the user to begin.
+- Application implementation.
+
+### Acceptance criteria
+
+- Before narration begins, the user can select resume, document beginning, or any ordered section.
+- Selecting a section resolves deterministically to that section's first paragraph and persists it
+  as the document's current reading position.
+- Documents without reliable chapter headings remain navigable through their fallback sections.
+- Navigating within an active reading session preserves every earlier interaction from that session.
+- Navigation cannot mutate the immutable anchor of an active conversational episode.
+- Invalid or cross-document section and paragraph selections fail clearly.
+- The reader and session API contracts contain enough information to implement the behavior without
+  introducing semantic search or a new retrieval system.
+- Advanced navigation concepts remain explicitly deferred.
+
+### Verification
+
+- Trace start-from-beginning, resume, and start-from-section through the RFC and architecture.
+- Trace a mid-session section change followed by a new Ask and confirm that session dialogue is
+  preserved while the new episode receives the new paragraph anchor.
+- Trace a document with fallback sections and confirm every section is selectable.
+- Search the planning documents for language that still implies narration must begin at the first
+  document paragraph.
+
+### Completion review
+
+- The RFC now offers Resume, Start at beginning, and an ordered section picker before narration;
+  each detected or fallback section has an ID, title, order, and deterministic first paragraph ID.
+- The architecture validates document ownership for all position choices, persists the resolved
+  paragraph, and exposes the required document, reader, session, and position-route contracts.
+- Mid-session navigation pauses playback and preserves the reading session's complete dialogue.
+  It is rejected until an active episode ends, so navigation cannot mutate that episode's immutable
+  anchor; the next Ask creates a newly anchored episode at the selected location.
+- `FUTURE_IDEAS.md` records the V0 flat-section limit and retains semantic search, full-text search,
+  voice navigation, rich navigation, bookmarks, and sentence-level positioning as deferred work.
+- The RFC/architecture traces cover beginning, resume, detected section, fallback section, and the
+  active-session navigation sequence. A planning-document search found no remaining requirement
+  that narration always begin at the first document paragraph.
+
 ---
 
 # M1 — Application foundation and capability validation
 
 ## M1 sequencing
 
-M1 begins after M0-T07. Capability spikes should resolve external uncertainty before the related
+M1 begins after M0-T08. Capability spikes should resolve external uncertainty before the related
 integrations are used by the application. Scaffolding tickets may then establish the web/API
 boundary and persistence foundation. Fake capability operations provide deterministic development
 and testing seams; real provider integration belongs to later milestones unless a spike explicitly
 requires a live call.
 
+Recommended execution order with a work-in-progress limit of one:
+
+1. Complete M1-T01 so every later ticket uses the same repository and command conventions.
+2. Run the four risk spikes M1-T02 through M1-T05 and record measured constraints; their code may
+   remain disposable.
+3. Scaffold the API and web applications through M1-T06 and M1-T07.
+4. Establish the cross-application, persistence, and fake-capability foundations through M1-T08,
+   M1-T09, and M1-T11.
+5. Add the approved persisted domain schema in M1-T10.
+6. Run M1-T12 as the milestone integration gate and decompose M2 from the evidence collected.
+
+M1 validates external capabilities but does not add real provider calls to the product or implement
+upload, reader, navigation UI, narration, or Ask behavior.
+
 ## M1-T01 — Define the repository layout and local developer workflow
 
 **Status:** Ready
-**Depends on:** M0-T07
+**Depends on:** M0-T08
 
 ### Outcome
 
@@ -445,6 +533,12 @@ The chosen PDF libraries can extract usable metadata, outline information, layou
 - Exercise `pypdf` metadata and outline extraction.
 - Exercise `pdfplumber` layout-aware text extraction.
 - Inspect page ordering, headings, paragraph reconstruction signals, and hyphenation.
+- Record the normalized extracted character count and enough structure to evaluate the configured
+  full-document budget profiles used by B6 and B7.
+- Confirm that detected or fallback sections can partition the normalized paragraphs exactly once
+  and that each section has a deterministic first paragraph for later navigation.
+- Confirm that section, paragraph, and available page markers can be retained for canonical source
+  serialization without creating a second text order.
 - Record observed failure modes and representative extracted samples.
 - Keep spike code disposable unless it already meets production-quality boundaries.
 
@@ -459,13 +553,20 @@ The chosen PDF libraries can extract usable metadata, outline information, layou
 
 - The selected PDF produces ordered, readable text without OCR.
 - Outline or heading signals are characterized.
-- At least three benchmark passages can be located in extracted output.
+- All benchmark passages P1–P5 can be located in extracted output with their available page and
+  structural markers.
+- The normalized corpus size used by document-wide budget tests is recorded reproducibly.
+- Extracted paragraphs can be assigned to ordered detected or fallback sections without gaps,
+  overlap, duplication, or reordering.
+- Every resulting section resolves to one deterministic first paragraph suitable for the flat
+  section-navigation contract.
 - Known extraction limitations are documented as constraints or follow-up tickets.
 
 ### Verification
 
 - Compare extracted benchmark passages with the source PDF manually.
 - Confirm that extraction neither silently omits nor materially reorders those passages.
+- Check the ordered section/paragraph walk and first-paragraph resolution against the selected PDF.
 
 ## M1-T03 — Spike browser recording and transcription compatibility
 
@@ -492,14 +593,16 @@ A short browser-compatible recording can be accepted by the selected transcripti
 ### Acceptance criteria
 
 - A representative recording is transcribed successfully.
-- The result is accurate enough for all five benchmark question styles.
+- The result is accurate enough for representative local, current-section, document-wide,
+  same-episode follow-up, and later-episode session-continuity questions from `BENCHMARK.md`.
 - Required MIME type, duration limit, configuration, and error behavior are documented.
 - Any required format conversion becomes an explicit ticket rather than hidden scope.
 
 ### Verification
 
 - Compare the returned transcript with the spoken question.
-- Record the observed end-to-end request latency.
+- Record the observed end-to-end request latency, accepted MIME type, maximum V0 recording duration,
+  and any browser or conversion constraint that must become configuration or backlog work.
 
 ## M1-T04 — Spike narration and answer TTS quality
 
@@ -513,6 +616,8 @@ The selected TTS endpoint can produce acceptable MP3 narration for both source p
 ### Scope
 
 - Synthesize one source passage and one detailed explanatory answer.
+- Include at least one answer long enough to expose pacing or long-form stability problems relevant
+  to a substantive spoken explanation.
 - Compare a small set of supported voices if necessary.
 - Check pronunciation, pacing, long-form stability, output format, latency, and retry behavior.
 - Select an initial voice and record the configuration rationale.
@@ -528,7 +633,8 @@ The selected TTS endpoint can produce acceptable MP3 narration for both source p
 - The endpoint returns browser-playable MP3 audio.
 - One initial voice is selected for V0.
 - Passage and answer audio are intelligible and acceptable for continued listening.
-- Relevant limits, latency, configuration, and cache-version inputs are documented.
+- Relevant limits, latency, configuration, and cache-version inputs are documented, including the
+  selected voice and every model/voice setting that must invalidate cached audio.
 
 ### Verification
 
@@ -538,7 +644,7 @@ The selected TTS endpoint can produce acceptable MP3 narration for both source p
 ## M1-T05 — Spike reasoning quality with the context contract
 
 **Status:** Backlog  
-**Depends on:** M0-T02, M0-T04, M0-T06, M0-T07, M1-T01
+**Depends on:** M0-T02, M0-T04, M0-T06, M0-T07, M0-T08, M1-T01
 
 ### Outcome
 
@@ -547,28 +653,48 @@ The selected reasoning model can answer benchmark questions usefully and remain 
 ### Scope
 
 - Construct representative local, section, fitting full-document, limited document-wide, and dialogue context packages.
-- Run the primary benchmark questions, same-episode follow-ups, and the cross-episode reading-session sequence.
-- Observe answer quality, grounding, depth, latency, and prompt-size behavior.
-- Record prompt adjustments required for implementation.
+- Run benchmark cases B1–B7 and sequences S1–S3 using the RFC-selected scopes and source-authority
+  rules.
+- Exercise both deterministic token-estimator and conservative normalized-character budgeting when
+  both are viable; otherwise record why one mode is selected for V0.
+- Measure the exact fitting and over-budget candidate prompts, including instructions, labels,
+  markers, complete active-session dialogue, question, answer reserve, and safety margin.
+- Observe answer quality, grounding, depth, latency, input/output size, and estimated cost behavior.
+- Recommend initial values or derivation rules for model context limit, reserved answer tokens,
+  safety margin, conservative characters per token when applicable, maximum transcribed question,
+  and active-session prompt failure behavior.
+- Record the prompt shape, guardrails, configuration, and risks required for implementation.
 
 ### Out of scope
 
 - Automated evaluation infrastructure.
 - Full-document retrieval.
 - Production prompt-version persistence.
+- Implementing the context builder or real reasoning integration in the application.
 
 ### Acceptance criteria
 
 - Local explanations correctly use the anchored passage and section context.
+- Current-section answers use the complete bounded section without relying on an unused synopsis or
+  duplicate local source context.
 - Follow-up and later-episode answers make coherent use of every earlier turn from the active reading session.
 - The model distinguishes supplied text from general background knowledge.
-- Document-wide claims are grounded when canonical full-document source is supplied and otherwise refused or clearly qualified as limited context.
-- Material quality or latency risks are documented before M3 implementation.
+- B6 document-wide claims are grounded in the canonical full-document source and its markers.
+- B7 clearly identifies its supplied limited layers and does not imply retrieval, search, or
+  complete-document analysis.
+- Fitting and over-budget decisions are reproducible without a model call and never remove source or
+  active-session turns to force a fit.
+- Initial context-budget and answer-reserve configuration recommendations are documented with the
+  measurements that justify them.
+- Material quality, cost, latency, or context-limit risks are documented before M3 implementation.
 
 ### Verification
 
-- Manually evaluate responses using the benchmark notes from M0-T04.
-- Record representative successes, failures, and observed latency.
+- Manually evaluate B1–B7 and S1–S3 using `BENCHMARK.md`.
+- Record representative successes, failures, prompt measurements, observed latency, and estimated
+  cost.
+- Recalculate at least one fitting and one over-budget decision independently from the recorded
+  inputs.
 
 ## M1-T06 — Scaffold the FastAPI application
 
@@ -583,6 +709,9 @@ A minimal FastAPI application starts locally, loads validated configuration, and
 
 - Create the API package and application entry point.
 - Add environment-based configuration with clear validation errors.
+- Establish typed configuration locations for local paths, database behavior, model identifiers,
+  recording limits, context-budget inputs, and audio-cache versioning without making live provider
+  calls.
 - Add `GET /api/health`.
 - Establish the initial error-response shape.
 - Add a focused automated test.
@@ -599,6 +728,7 @@ A minimal FastAPI application starts locally, loads validated configuration, and
 - The documented command starts the API.
 - `GET /api/health` returns HTTP 200 and a stable response.
 - Missing required configuration fails clearly when the relevant feature is invoked or at startup, according to the chosen policy.
+- Backend-only provider and context configuration cannot be exposed through a public API response.
 - The health-endpoint test passes.
 
 ### Verification
@@ -714,7 +844,7 @@ The API has a tested local persistence foundation with repeatable schema migrati
 ## M1-T10 — Add the initial persisted domain schema
 
 **Status:** Backlog  
-**Depends on:** M0-T03, M0-T06, M1-T09
+**Depends on:** M0-T03, M0-T06, M0-T07, M0-T08, M1-T09
 
 ### Outcome
 
@@ -722,7 +852,8 @@ The database represents the minimum V0 document, reading-session, conversational
 
 ### Scope
 
-- Add `Document`, `Section`, `Paragraph`, `ReadingSession`, `ConversationEpisode`, and `Interaction` tables.
+- Add `Document`, `Section`, `Paragraph`, `ReadingSession`, `ConversationEpisode`, and `Interaction`
+  tables with the fields approved in `ARCHITECTURE.md`.
 - Add ordering, ownership, status, timestamps, and reading-position fields required by V0.
 - Add foreign keys and uniqueness constraints that enforce stable ordering and ownership.
 - Create the migration and focused persistence tests.
@@ -737,10 +868,18 @@ The database represents the minimum V0 document, reading-session, conversational
 ### Acceptance criteria
 
 - The schema supports ordered sections and paragraphs without duplicated ownership fields.
+- Document status, bounded document map, source path, processing failure information, and current
+  paragraph state are represented.
+- Section boundary source, cached-synopsis metadata, order, and available page range are represented;
+  its navigation first paragraph remains derived from ordered member paragraphs rather than stored
+  as a competing source of truth.
 - Reading sessions and their conversational episodes have deterministic order.
 - An interaction can be ordered within an episode, included in chronological session context, and anchored through its episode to a paragraph.
 - At most one reading session per document and one episode per session can be active.
 - A document can store one current reading position.
+- Database constraints are used where SQLite can express the invariant; cross-table ownership rules
+  that require application validation are documented and covered by focused query/service tests at
+  the appropriate later ticket.
 - Processing states and retry-related failure fields match the architecture.
 - The migration applies cleanly to a fresh database and tests cover key constraints.
 
@@ -762,6 +901,8 @@ Application services and future end-to-end tests can exercise reasoning, transcr
 
 - Define the three application-owned operations required by the architecture: generate text, transcribe recording, and synthesize speech.
 - Add deterministic fake implementations with configurable success and failure responses.
+- Make the text fake able to return scope-specific answers and the speech fake return stable
+  browser-playable fixture bytes or an equally deterministic application-owned audio value.
 - Keep the seam small and avoid a generic provider registry.
 - Add focused tests for fake behavior and error mapping.
 
@@ -775,6 +916,8 @@ Application services and future end-to-end tests can exercise reasoning, transcr
 
 - Each fake operation returns deterministic application-owned values.
 - Tests can simulate transient and permanent failures.
+- Tests can distinguish local, section, fitting full-document, limited document-wide, transcription,
+  and synthesis paths without inspecting or changing provider-specific code.
 - No network access is required.
 - The interface remains limited to current V0 operations.
 
@@ -786,7 +929,7 @@ Application services and future end-to-end tests can exercise reasoning, transcr
 ## M1-T12 — Establish the integrated verification baseline
 
 **Status:** Backlog  
-**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11
+**Depends on:** M1-T02, M1-T03, M1-T04, M1-T05, M1-T08, M1-T09, M1-T10, M1-T11
 
 ### Outcome
 
@@ -797,14 +940,20 @@ The application foundation has a documented, repeatable verification procedure a
 - Document setup, migration, start, test, lint, and type-check procedures.
 - Provide one convenient verification command or a short ordered command sequence.
 - Verify the web/API boundary, database migration, domain schema, and fake capabilities together.
+- Review all four capability-spike reports and consolidate their accepted V0 configuration values,
+  constraints, and unresolved risks into authoritative developer documentation and example
+  environment configuration without committing secrets.
 - Update `AGENTS.md` with the final commands and conventions.
-- Record any deferred work as M2 tickets rather than implementing it.
+- Reconcile M1 completion against every exit criterion in `ROADMAP.md`.
+- Decompose M2 into implementation-ready tickets using the completed M1 evidence, and move only the
+  first dependency-satisfied M2 ticket to `Ready`.
 
 ### Out of scope
 
 - PDF upload or reader features.
 - Real model integrations beyond completed spikes.
 - Deployment automation.
+- Implementing any M2 upload, reader, navigation, or narration behavior.
 
 ### Acceptance criteria
 
@@ -812,11 +961,18 @@ The application foundation has a documented, repeatable verification procedure a
 - Backend tests, frontend tests, linting, and type checking pass.
 - A fresh database can be migrated.
 - The browser reaches the API health endpoint.
+- PDF extraction, STT, TTS, and reasoning spike reports contain the measurements and decisions
+  required by their tickets.
+- Authoritative configuration documents the initial recording, context-budget, answer-reserve,
+  safety-margin, model/voice, and audio-cache inputs established by the spikes.
 - M1 exit criteria in `ROADMAP.md` are satisfied.
+- M2 has an ordered, dependency-aware backlog based on evidence rather than speculative
+  implementation detail.
 
 ### Verification
 
 - Execute the complete documented procedure from a clean local state.
+- Audit M1-T01 through M1-T11 and the four spike artifacts against their acceptance criteria.
 - Review M1 completion against `ROADMAP.md` and this backlog.
 
 ---
