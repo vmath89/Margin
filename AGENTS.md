@@ -41,15 +41,22 @@ Preserve these principles unless an approved RFC change says otherwise:
 - A paragraph is the stable reading-position and resume anchor, not the full semantic context boundary.
 - Model context is explicit, bounded, grounded, and constructed by application logic.
 - Sequential follow-up questions belong to one paused-reading conversational episode.
+- A reading session spans narration and multiple conversational episodes. Every complete earlier
+  interaction from the active reading session is model context, including interactions from ended
+  episodes.
+- Never silently truncate or summarize active-session dialogue. If the complete required prompt
+  exceeds the configured limit, fail clearly and require a new reading session.
 - Uploaded source text is authoritative. General model knowledge must be identified as background and must not be presented as evidence from the uploaded document.
-- Precise book-wide claims require supplied evidence; full-document retrieval is deferred.
+- Precise document-wide claims require supplied evidence. An explicit document-wide question may
+  receive the complete normalized document only when its full required prompt fits the configured
+  deterministic budget; retrieval remains deferred.
 - V0 is a trusted, single-user prototype on one host.
 
 Do not introduce these without a new approved requirement:
 
 - Autonomous agents or multi-agent systems.
 - Embeddings, vector databases, or hidden retrieval.
-- Long-term learner memory or cross-document knowledge graphs.
+- Cross-session conversation recall, long-term learner memory, or cross-document knowledge graphs.
 - Authentication, billing, multi-user isolation, or production-scale infrastructure.
 - WebSockets, real-time speech-to-speech, wake words, or answer interruption.
 - OCR or broad image-only PDF support.
@@ -62,10 +69,14 @@ Do not introduce these without a new approved requirement:
 - SQLite is the V0 database and has one backend writer.
 - SQLAlchemy query functions should remain small and explicit; do not add generic repository classes.
 - PDF parsing and splitting should be deterministic and testable without model calls.
-- The context builder should be deterministic application logic over persisted data and the current question.
+- The context builder should be deterministic application logic over persisted data, the active
+  reading session and episode, and the current question.
 - External capability boundaries should expose only the operations V0 needs: text generation, transcription, and speech synthesis.
 - Slow external calls must not run inside database transactions.
 - Source text must never be silently truncated, omitted, duplicated, overlapped, or reordered.
+  A fitting full-document context serializes every normalized section and paragraph exactly once
+  in canonical source order; an over-budget document-wide request uses clearly labeled limited
+  context without implying complete-document analysis.
 - Generated audio is disposable and reproducible from authoritative stored text.
 - New abstractions must solve a current ticket requirement or make an existing boundary directly testable.
 

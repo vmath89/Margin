@@ -61,14 +61,14 @@ The initial limits are configuration, not database data:
 - maximum section and whole-section question context: 100,000 characters.
 - document map: configured maximum entry and character limits, with omitted entries marked;
 - section synopsis: configured maximum characters, generated only from the bounded current-section text;
-- recent dialogue: configured maximum complete turns and characters;
+- complete reading-session dialogue: configured maximum total characters; no turn is silently omitted or summarized;
 - transcribed question: configured maximum input characters.
 
 These conservative character limits keep behavior easy to test across OpenRouter models. A limit violation is reported clearly rather than silently truncating source text.
 
 ### Listen
 
-1. The web app loads the document's `current_paragraph_id` and requests that paragraph with nearby paragraphs.
+1. The web app creates or resumes the document's active `ReadingSession`, then loads the document's `current_paragraph_id` and requests that paragraph with nearby paragraphs. A reading session remains active across Continue operations and page reloads until the user explicitly ends it or starts a new one.
 2. It requests MP3 narration for the current paragraph. FastAPI serves an existing file or generates it through OpenRouter TTS and saves it at a predictable path containing the TTS configuration version and paragraph ID.
 3. The browser plays one paragraph at a time, highlights it, and prefetches the next paragraph's audio.
 4. On paragraph transition, pause, or skip, the browser saves the current paragraph ID on the document.
@@ -80,19 +80,20 @@ Paragraph is the synchronization unit for highlighting and resume. Pausing midwa
 
 1. The user pauses and presses **Ask**. The browser records at most two minutes as `audio/webm` and uploads it with the current paragraph ID.
 2. FastAPI verifies that the paragraph belongs to the requested document and transcribes the recording through OpenRouter STT.
-3. The first Ask for a paused reading position creates an active `ConversationEpisode` anchored to that paragraph. A follow-up reuses that active episode and must use its original anchor; it cannot silently move the reading position. Reading remains paused throughout the episode.
+3. The first Ask for a paused reading position creates an active `ConversationEpisode` inside the active `ReadingSession` and anchors it to that paragraph. A follow-up reuses that active episode and must use its original anchor; it cannot silently move the reading position. Reading remains paused throughout the episode.
 4. Context scope uses a deliberately small rule, with no classifier model call:
    - default to local-passage context;
    - use section context only when the question explicitly refers to the chapter or section as a whole;
-   - use limited book-wide context only when it explicitly refers to the book/document as a whole or asks where else something appears.
-5. The context builder deterministically assembles, in order, document orientation, the scope-appropriate current-section context, local context when applicable, bounded recent dialogue from the active episode, and the current question. It includes at most two preceding ordered paragraphs, the unchanged anchor, and one following ordered paragraph; each is whole and in source order. It enforces all bounds before prompt assembly, rejects an over-limit question clearly rather than truncating it, and keeps only the newest complete question-and-answer turns that fit both dialogue budgets.
-6. Local and limited book-wide scopes require section background. FastAPI loads the current section's cached synopsis and, if absent, generates and saves it from that section's bounded source text. No paragraph summaries are generated or persisted. Current-section scope sends the complete bounded section and does not generate an unused synopsis.
+   - for an explicit document-wide or “where else” question, first select full-document context when its complete candidate prompt fits the configured budget; otherwise select clearly labeled limited document-wide context.
+5. The context builder deterministically assembles, in order, exact system and prompt instructions, document orientation, the scope-appropriate source context, every complete earlier question-and-answer turn from the active reading session, and the current question. Full-document context serializes all normalized sections and paragraphs exactly once in canonical order with available section, paragraph, and page markers; it does not also send a duplicate local window or section synopsis. Before selecting it, the builder measures the exact normalized candidate prompt with a configured deterministic token estimator or conservative normalized-character equivalent. The input allowance is `model_context_limit - reserved_answer_tokens - safety_margin`; page and word counts are informational only. It never drops, truncates, or summarizes source text or a session turn to meet this allowance. If the selected limited package also cannot fit with the complete dialogue and question, it rejects the Ask clearly and instructs the user to start a new reading session.
+6. Local and limited document-wide scopes require section background. FastAPI loads the current section's cached synopsis and, if absent, generates and saves it from that section's bounded source text. No paragraph summaries are generated or persisted. Current-section scope sends the complete bounded section and does not generate an unused synopsis.
 7. Document orientation contains extracted title and author when available, document type, and the stored bounded ordered document map of section titles. Omitted map entries are marked as omitted. Orientation and a generated section synopsis are aids to navigation and explanation, not evidence for a precise source claim. The system does not generate or store a whole-document summary.
-8. Local context contains document orientation, current section title and cached synopsis, the local passage window, bounded same-episode dialogue, and the question. Current-section context contains document orientation, the full current section, bounded same-episode dialogue, and the question. Limited book-wide context contains document orientation, current-section synopsis, local passage window, bounded same-episode dialogue, and the question; it does not search the document.
-9. The prompt permits the model to use prior knowledge about an identified work as clearly labeled background. It must treat supplied PDF text as authoritative, distinguish background knowledge and illustrations from the text, and never claim that something appears elsewhere in the uploaded document without supplied evidence. For book-wide questions it must clearly state that full-document retrieval is unavailable and cannot verify other locations in the uploaded document.
+8. Local context contains document orientation, current section title and cached synopsis, the local passage window, complete active-session dialogue, and the question. Current-section context contains document orientation, the full current section, complete active-session dialogue, and the question. Full-document context contains orientation, the canonical full normalized source, complete active-session dialogue, and the question. Limited document-wide context contains orientation, current-section synopsis, local passage window, complete active-session dialogue, and the question; it does not search the document.
+9. The prompt permits the model to use prior knowledge about an identified work as clearly labeled background. It must treat supplied PDF text as authoritative, distinguish background knowledge and illustrations from the text, and never claim that something appears elsewhere in the uploaded document without supplied evidence. A full-document package can support such a location claim; a limited document-wide package must state the layers examined and that it did not examine the complete document.
+   Reading-session dialogue is conversational memory rather than source evidence: an earlier generated answer cannot independently support a new claim about the uploaded document.
 10. The reasoning model returns text. FastAPI stores one complete `Interaction` containing the episode, turn order, transcript, answer, scope, and minimal model metadata; its anchor paragraph is derived through the episode. FastAPI then returns it immediately.
 11. The web app displays the answer and requests its MP3 from a separate audio endpoint. Answer TTS therefore has the same retryable, cache-on-demand behavior as paragraph TTS and cannot duplicate the stored interaction.
-12. The browser plays the answer. A further Ask repeats this flow within the same active episode. When the user presses **Continue Reading**, FastAPI ends that episode, retains its interactions for history, and resumes narration at its anchored paragraph. A later Ask creates a new episode with no prior-episode dialogue.
+12. The browser plays the answer. A further Ask repeats this flow within the same active episode. When the user presses **Continue Reading**, FastAPI ends that episode, retains it inside the active reading session, and resumes narration at its anchored paragraph. A later Ask in the same reading session creates a new episode at the new paragraph and receives the interactions from every earlier episode in that session.
 
 Transcription and the textual answer use one normal request/response operation with a visible processing state. TTS is a separate request. Streaming, WebSockets, speech-to-speech orchestration, and interruption of an answer are out of scope.
 
@@ -108,6 +109,7 @@ Responsibilities:
 - manage paragraph and answer audio playback;
 - highlight the paragraph currently being narrated;
 - expose play, pause, previous paragraph, playback speed, ask, and continue controls;
+- create, resume, and explicitly end a reading session;
 - persist paragraph changes through FastAPI.
 
 Only audio element state, playback speed, loading state, and prefetched URLs remain in browser memory. The browser does not construct model context and is not the authoritative reading-position store.
@@ -129,10 +131,12 @@ The V0 API surface is:
 | `POST /api/documents` | Upload a PDF and start processing | Document ID and status |
 | `GET /api/documents/{id}` | Poll status or load metadata and position | Document, status/error, current paragraph ID |
 | `POST /api/documents/{id}/retry` | Retry a failed processing run | Updated document status |
+| `POST /api/documents/{id}/sessions` | Create or resume the active reading session | Reading session ID and status |
+| `POST /api/documents/{id}/sessions/{session_id}/end` | Explicitly end the active reading session | Ended reading session |
 | `GET /api/documents/{id}/reader?paragraph_id=...` | Load the selected paragraph and nearby ordered paragraphs | Reader window with stable paragraph IDs |
 | `PUT /api/documents/{id}/position` | Save `{ paragraph_id }` | Saved paragraph ID |
 | `GET /api/paragraphs/{id}/audio` | Get or generate paragraph narration | `audio/mpeg` |
-| `POST /api/documents/{id}/interactions` | Start or continue the document's active episode with question audio; produce transcript plus textual answer | Stored interaction and episode ID |
+| `POST /api/documents/{id}/interactions` | Start or continue the active session's conversational episode with question audio; produce transcript plus textual answer | Stored interaction, session ID, and episode ID |
 | `POST /api/documents/{id}/episodes/{episode_id}/continue` | End the active episode and resume at its anchor | Ended episode and anchored paragraph ID |
 | `GET /api/interactions/{id}/audio` | Get or generate answer narration | `audio/mpeg` |
 
@@ -144,9 +148,9 @@ The original PDF is retained. All derived section and paragraph rows are committ
 
 ### Reading and question functions
 
-Reading functions load ordered paragraphs, save position, and generate paragraph audio. Question functions create or validate the single active episode for a document, transcribe audio, select the explicit scope rule, lazily generate the current-section synopsis when the selected context needs it, build bounded context, request an answer, and store the ordered interaction. Continue functions end the matching active episode and restore its anchor as the document's reading position.
+Reading functions create or resume a reading session, load ordered paragraphs, save position, and generate paragraph audio. Question functions create or validate the single active episode within that session, transcribe audio, select the explicit scope rule, lazily generate the current-section synopsis when the selected context needs it, build bounded context with all earlier session interactions, request an answer, and store the ordered interaction. Continue functions end only the matching episode and restore its anchor as the document's reading position. Ending a reading session is a separate explicit operation.
 
-The context builder is pure application logic: persisted domain data, the active episode, and a question produce an explicit scope and model input. It selects only whole source paragraphs and whole dialogue turns, in deterministic order; it never queries beyond the RFC's selected layers. The OpenRouter integration cannot query the database or choose passages.
+The context builder is pure application logic: persisted domain data, the active reading session, its active episode, and a question produce an explicit scope and model input. It selects only whole source paragraphs and includes every complete earlier session turn in deterministic episode and turn order; it never queries beyond the RFC's selected source layers. The OpenRouter integration cannot query the database or choose passages.
 
 ### OpenRouter integration
 
@@ -175,12 +179,13 @@ SQLite runs in WAL mode. Exactly one backend process may write to it or execute 
 | `Document` | ID, title, author, document type, bounded ordered document map, source path, status, failure code/message, current paragraph ID, timestamps |
 | `Section` | ID, document ID, order, title, boundary source (`outline`, `heading`, or `fallback`), nullable cached synopsis, synopsis prompt version/model ID, start/end page |
 | `Paragraph` | ID, section ID, order, text, start/end page |
-| `ConversationEpisode` | ID, document ID, anchored paragraph ID, status (`active` or `ended`), started time, ended time |
+| `ReadingSession` | ID, document ID, status (`active` or `ended`), started time, ended time |
+| `ConversationEpisode` | ID, reading session ID, session order, anchored paragraph ID, status (`active` or `ended`), started time, ended time |
 | `Interaction` | ID, episode ID, turn order, question transcript, answer text, context scope, prompt version, OpenRouter model ID, created time |
 
-`ConversationEpisode.anchored_paragraph_id` must belong to its document. `Interaction.turn_order` is unique and ascending within its episode, so complete turns have a deterministic order. There is at most one active episode per document. Foreign keys are not duplicated when they can be derived: a paragraph determines its section and document, and an interaction determines its anchored paragraph, section, and document through its episode. `current_paragraph_id` lives on `Document` because there is one user and one reading position per document.
+There is at most one active `ReadingSession` per document and at most one active `ConversationEpisode` per reading session. `ConversationEpisode.session_order` is unique and ascending within its session; `Interaction.turn_order` is unique and ascending within its episode. The pair gives every complete session turn a deterministic chronological order. `ConversationEpisode.anchored_paragraph_id` must belong to its session's document. Foreign keys are not duplicated when they can be derived: a paragraph determines its section and document, and an interaction determines its session, anchored paragraph, section, and document through its episode. `current_paragraph_id` lives on `Document` because there is one user and one reading position per document.
 
-Persist the original PDF, normalized sections and paragraphs, the bounded document map, lazily cached section synopses, processing errors, reading position, episodes, and textual interactions. Do not persist a whole-document or paragraph summary. The question recording is deleted after successful transcription and may also be deleted after a failed request once its error has been returned.
+Persist the original PDF, normalized sections and paragraphs, the bounded document map, lazily cached section synopses, processing errors, reading position, reading sessions, episodes, and textual interactions. Do not persist a whole-document or paragraph summary. The question recording is deleted after successful transcription and may also be deleted after a failed request once its error has been returned.
 
 Generated MP3 files are disposable and are not represented by database rows. Their paths are:
 
@@ -236,15 +241,15 @@ PDF parsing uses `pypdf` only for metadata and outline destinations and `pdfplum
 
 **Generate MP3 on demand.** This avoids narrating an entire unread book during upload. The first play may wait for TTS; prefetching only the next paragraph limits that delay and cost.
 
-**Use relational rows, but no repository architecture.** Sections, paragraphs, episodes, and interactions need ordered access and foreign-key integrity. SQLAlchemy query functions are sufficient for V0.
+**Use relational rows, but no repository architecture.** Sections, paragraphs, reading sessions, episodes, and interactions need ordered access and foreign-key integrity. SQLAlchemy query functions are sufficient for V0.
 
-**Use explicit hierarchical context, not retrieval.** The context builder follows the RFC and is inspectable in tests. No embeddings, vector database, full-document search, agents, or hidden retrieval path exists.
+**Use explicit hierarchical context, not retrieval.** The context builder follows the RFC and is inspectable in tests. An under-budget explicit document-wide question may receive the canonical complete normalized source, but no embeddings, vector database, full-document search, agents, or hidden retrieval path exists.
 
 **Use one flat, lossless section structure.** Book chapters, paper/report headings, and generated fallback chunks share the same `Section` object. Semantic signals are preferred, but every document receives bounded sections. Stored text never overlaps; overlap, if ever needed for a model prompt, is assembled temporarily from neighboring paragraphs.
 
-**Generate section synopses lazily and omit a document summary.** Upload performs no model reasoning beyond deterministic map construction. The first local or limited book-wide question that needs section background pays the one-time synopsis latency and cost; later questions reuse it. A section-wide question uses the bounded section text directly. Document orientation is extracted metadata plus the stored bounded ordered section-title map, with omitted entries marked and model prior knowledge permitted only as non-authoritative background.
+**Generate section synopses lazily and omit a document summary.** Upload performs no model reasoning beyond deterministic map construction. The first local or limited document-wide question that needs section background pays the one-time synopsis latency and cost; later questions reuse it. A section-wide question uses the bounded section text directly. A fitting full-document question instead receives canonical stored source text. Document orientation is extracted metadata plus the stored bounded ordered section-title map, with omitted entries marked and model prior knowledge permitted only as non-authoritative background.
 
-**Make a paused conversation an explicit episode.** An episode gives the original reading anchor and its ordered interactions a durable, inspectable boundary. Recent dialogue is selected only from that episode and only as bounded temporary model context; ending the episode preserves stored interactions without carrying them into a later Ask.
+**Separate a reading session from a paused conversational episode.** A reading session is the continuity boundary across listening and multiple pauses. Each episode gives one reading anchor and its ordered interactions a durable, inspectable boundary. Every complete turn from the active reading session enters each reasoning request, including turns from ended episodes. V0 never silently compacts that history; when it no longer fits with required source context, the user must start a new reading session. Cross-session recall and conversation summarization remain deferred.
 
 **Use OpenRouter as the only model gateway.** It allows model changes without multiple provider integrations or credentials. The tradeoff is dependence on OpenRouter's endpoint behavior, model catalog, routing, and availability.
 
@@ -252,11 +257,11 @@ PDF parsing uses `pypdf` only for metadata and outline destinations and `pdfplum
 
 ### Testing approach
 
-- Unit-test nested-outline flattening, heading detection, paragraph reconstruction, deterministic document-map bounds and omission markers, bounded fallback sections, no-loss/no-overlap ordering, lazy section-synopsis caching, episode lifecycle and interaction ordering, scope rules, context bounds, prior-knowledge prompt guardrails, and audio paths as pure logic.
+- Unit-test nested-outline flattening, heading detection, paragraph reconstruction, deterministic document-map bounds and omission markers, bounded fallback sections, no-loss/no-overlap ordering, canonical full-document serialization and markers, deterministic full-prompt budget calculation (including instructions, answer reserve, safety margin, complete dialogue, and question), scope rules and limited fallback disclosures, lazy section-synopsis caching, reading-session and episode lifecycle, chronological interaction ordering, whole-session context limits, prior-knowledge prompt guardrails, and audio paths as pure logic.
 - Test processing state transitions and query functions against a temporary SQLite database, including interrupted processing and retry without duplicate rows.
 - Replace the three OpenRouter operations with fakes for service and API tests. Keep a small opt-in live OpenRouter smoke test for each configured model.
 - Store small legal PDF fixtures for bookmarks, no bookmarks, long text blocks, and no extractable text.
-- Run the Playwright happy path against the real Next.js and FastAPI apps with a temporary SQLite database and fake OpenRouter operations: upload, wait until ready, play/pause, submit prerecorded audio, display/play an answer, submit a follow-up using the same episode and anchor, and continue from that anchor.
+- Run the Playwright happy path against the real Next.js and FastAPI apps with a temporary SQLite database and fake OpenRouter operations: upload, wait until ready, play/pause, submit prerecorded audio, display/play an answer, submit a same-episode follow-up, continue, read to another anchor, ask a new question that uses earlier session dialogue, and continue from the new episode's anchor.
 
 ## Assumptions
 
@@ -268,7 +273,8 @@ PDF parsing uses `pypdf` only for metadata and outline destinations and `pdfplum
 - Documents without reliable structural signals use bounded contiguous fallback sections rather than one giant section.
 - English is the initial document, question, answer, and narration language.
 - The user explicitly presses Ask and Continue. Wake words, voice activity detection, and answer interruption are out of scope.
-- Book-wide questions have the RFC's explicit limitation.
+- A reading session spans multiple Continue operations and ends only through an explicit session boundary; cross-session conversation recall is out of scope.
+- Explicit document-wide questions use canonical full-document context only when the complete required prompt fits the RFC budget; otherwise they have the RFC's explicit limited-context disclosure.
 - V0 generates no whole-document summary; it stores a bounded ordered document map, and a section synopsis is generated only when a selected question context first needs it and is then cached.
 - Model prior knowledge about an identified work is optional background and never overrides or substitutes for supplied PDF text.
 - All reasoning, STT, and TTS model traffic goes through OpenRouter.
@@ -278,9 +284,9 @@ PDF parsing uses `pypdf` only for metadata and outline destinations and `pdfplum
 1. The core loop remains **Listen → Pause → Ask → Understand → Follow-up → Continue**; a follow-up is optional but supported while reading is paused.
 2. Paragraph IDs and ordering are canonical for display, context, navigation, narration, and resume.
 3. Ordered sections partition normalized paragraphs exactly once: no gaps, overlap, duplication, or reordering.
-4. Source text is never silently truncated; configured limits produce a clear error or deterministic chunking.
+4. Source text is never silently truncated; configured limits produce a clear error or deterministic processing chunking. A fitting full-document prompt serializes every normalized paragraph exactly once in canonical order.
 5. Context selection is explicit, bounded, and testable without a model call.
-6. The reasoning model receives only the RFC's bounded document orientation, scope-appropriate current-section context, local passages when applicable, complete recent turns from the active episode, and the current question; there is no implicit retrieval.
+6. The reasoning model receives only the RFC's bounded document orientation, scope-appropriate source context (including canonical complete source only for a fitting explicit document-wide question), every complete earlier turn from the active reading session, and the current question; there is no implicit retrieval.
 7. All model traffic and credentials remain behind the single backend OpenRouter module.
 8. The uploaded PDF and normalized source text are authoritative. Model prior knowledge and generated section synopses are supporting context, and generated audio is disposable.
 9. Slow OpenRouter calls never run inside database transactions.
@@ -288,4 +294,8 @@ PDF parsing uses `pypdf` only for metadata and outline destinations and `pdfplum
 11. V0 uses exactly one backend worker and no authentication, durable queue, vector database, or multi-agent system.
 12. End-to-end tests cross the real browser/API boundary and replace only OpenRouter calls.
 13. New abstractions must solve a present V0 problem or make an existing boundary directly testable.
-14. An episode retains one immutable paragraph anchor until Continue ends it; no dialogue from an ended or different episode enters model context.
+14. An episode retains one immutable paragraph anchor until Continue ends it. Continue does not end its reading session, and every ended episode in that active session remains model context.
+15. V0 never silently omits or summarizes an active-session turn. If the complete required prompt does not fit the configured model-input limit, the Ask fails clearly and requires a new reading session.
+16. Dialogue from an ended or different reading session never enters model context.
+17. Full-document eligibility is a deterministic exact-candidate-prompt calculation that reserves configured answer capacity and safety margin; it includes all complete active-session dialogue and never makes a document fit by omitting, truncating, sampling, or summarizing source or dialogue.
+18. Limited document-wide context explicitly identifies its supplied layers and does not claim complete-document analysis; document-wide location claims require supplied canonical complete source.

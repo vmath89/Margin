@@ -182,8 +182,10 @@ The product should initially be extremely simple.
 For V0, that means one supported, text-based PDF in a trusted single-user web application.
 The reader explicitly presses **Ask** after pausing; it supports a bounded spoken
 conversation anchored to that paragraph and resumes only when the reader presses
-**Continue**. EPUBs, articles, persistent reader knowledge, and more natural interruption
-mechanisms remain part of the longer-term direction, not V0 requirements.
+**Continue**. Within the active reading session, later questions retain every earlier discussion
+even after narration has resumed and paused at a new passage. EPUBs, articles, cross-session
+reader knowledge, and more natural interruption mechanisms remain part of the longer-term
+direction, not V0 requirements.
 
 ### **Upload or open something.**
 

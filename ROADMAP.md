@@ -23,10 +23,12 @@ V0 succeeds when a user can:
 1. Upload a supported text-based PDF.
 2. Listen to ordered document narration.
 3. Pause at a passage and ask a spoken question.
-4. Receive a useful answer grounded in local, section, and lightweight document context.
+4. Receive a useful answer grounded in local, section, and document-wide context when the complete
+   normalized source safely fits; otherwise receive an honest limited-context answer.
 5. Ask at least one natural follow-up question while remaining anchored to the passage.
-6. Hear the answers and continue narration from the correct reading position.
-7. Use the product on a real difficult document and prefer the integrated loop to manually switching between a reader and a general-purpose assistant.
+6. Continue narration, pause later, and ask a question that naturally uses an earlier discussion from the same reading session.
+7. Hear the answers and continue narration from the correct reading position.
+8. Use the product on a real difficult document and prefer the integrated loop to manually switching between a reader and a general-purpose assistant.
 
 ## Milestones
 
@@ -38,14 +40,18 @@ V0 succeeds when a user can:
 
 - The RFC distinguishes the reading anchor from the context boundary.
 - Sequential follow-up questions are explicitly part of V0.
-- The document, section, local, and conversation context layers are defined.
-- Book-wide retrieval limitations are stated without implying false document knowledge.
+- The document, section, local, and whole-reading-session conversation context layers are defined.
+- Conditional full-document context and its over-budget limited-context disclosure are stated
+  without implying false document knowledge or retrieval.
 - One initial PDF and a benchmark question set are selected for development and evaluation.
 - Architecture invariants and the definition of done agree with the revised RFC.
 
 **Baseline approval:** M0-T05 confirms these criteria against the approved PDF and benchmark
 in `BENCHMARK.md`. V0 is a single-user, text-based-PDF product with explicit controls and a
-bounded same-episode conversation; its broader thesis aspirations remain deferred.
+persisted reading-session conversation spanning multiple pause episodes. M0-T06 supersedes the
+original same-episode-only context boundary; cross-session learner memory remains deferred.
+M0-T07 adds a bounded canonical full-document scope for explicit document-wide questions and
+retains a clearly disclosed limited mode when the complete candidate prompt does not fit.
 
 ### M1 — Application foundation and capability validation
 
@@ -56,7 +62,7 @@ bounded same-episode conversation; its broader thesis aspirations remain deferre
 - Next.js and FastAPI start using documented local commands.
 - The browser reaches FastAPI through same-origin `/api` routing.
 - SQLite, SQLAlchemy, and Alembic are configured.
-- The initial document, section, paragraph, interaction, and conversation schema exists.
+- The initial document, section, paragraph, reading-session, conversational-episode, and interaction schema exists.
 - Application services can use deterministic fake reasoning, transcription, and speech operations.
 - Focused spikes verify the selected PDF, STT input format, TTS output, and reasoning context outside the product flow.
 - Automated checks run through a documented verification command or procedure.
@@ -81,22 +87,24 @@ bounded same-episode conversation; its broader thesis aspirations remain deferre
 **Exit criteria:**
 
 - Browser audio is recorded and transcribed.
-- Context includes document orientation, current-section context, a local passage window, and the question.
+- Context includes document orientation, current-section context, a local passage window, all earlier dialogue from the active reading session, and the question.
 - The textual interaction is stored exactly once.
 - Answer audio is generated separately and can be retried.
 - Continue resumes from the recorded paragraph.
 
-### M4 — Multi-turn conversational reading
+### M4 — Session-continuous conversational reading
 
-**Outcome:** While narration is paused, the user can ask sequential follow-up questions that retain the passage anchor and relevant recent dialogue.
+**Outcome:** The user can converse while paused, continue reading, and later begin a new anchored conversation that remembers every earlier discussion from the same reading session.
 
 **Exit criteria:**
 
 - Follow-ups remain associated with one conversational episode.
-- The context builder includes a bounded recent dialogue history.
+- A reading session contains multiple ordered conversational episodes.
+- The context builder includes every complete earlier turn from the active reading session.
+- A context-limit failure is explicit and never silently drops or summarizes an earlier session turn.
 - The user can ask, hear an answer, ask again, and then continue.
-- Continuing closes the active conversational episode without losing stored interactions.
-- The benchmark follow-up questions produce coherent, grounded responses.
+- Continuing closes the active conversational episode without ending the reading session.
+- The benchmark same-episode and cross-episode questions produce coherent, grounded responses.
 
 ### M5 — V0 hardening and dogfooding
 
@@ -111,10 +119,15 @@ bounded same-episode conversation; its broader thesis aspirations remain deferre
 - Observed failures, latency, answer quality, and desired capabilities are recorded.
 - V1 work is selected from evidence rather than assumed in advance.
 
-## Explicitly deferred until evidence supports them
+## Future idea stash — post-V0/V2 candidates
 
-- Full-document retrieval and vector search.
-- Cross-document connections and learner memory.
+These ideas remain visible for later planning but are not V0 commitments. Promote them into a
+milestone only when real use supplies evidence for their priority.
+
+- Full-document retrieval/RAG and vector search beyond bounded canonical full-document context.
+- Retrieval or summarization over ended reading-session transcripts.
+- Automatic compaction of a long active session while preserving important distinctions and user intent.
+- Cross-document connections, learner memory, and personalized explanation history.
 - Autonomous or multi-agent orchestration.
 - Real-time speech-to-speech interaction.
 - Interrupting an answer while it is playing.

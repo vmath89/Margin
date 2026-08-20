@@ -38,12 +38,18 @@ The application reads the document aloud using high-quality text-to-speech.
 
 The current paragraph is highlighted.
 
+Pressing **Read** creates or resumes an active **reading session** for the document. A reading
+session spans narration and every pause-and-discuss episode until the user explicitly ends the
+session or starts a new one. Pressing **Continue Reading** does not end the reading session, and
+a page reload does not silently discard it.
+
 Basic controls:
 
 * Play  
 * Pause  
 * Skip backward  
 * Playback speed
+* End reading session as a secondary action
 
 ---
 
@@ -81,27 +87,52 @@ Every package ends with the current question and may include the following layer
 | Layer | Purpose | Contents and bound |
 | --- | --- | --- |
 | **Document orientation** | Identify the work and orient the explanation in its structure. It is not evidence for a precise textual claim. | Extracted title and author when available, document type, and an ordered document map of section titles. The map is limited by configured entry and character limits; omitted entries are marked as omitted. V0 stores this map, not a generated document synopsis. |
-| **Current-section context** | Explain how the passage relates to the current section. | Current section title plus a cached generated synopsis for local or limited book-wide questions. The synopsis has a configured maximum length and is generated only from that section's bounded source text. A whole-section question receives the complete current section instead, which must fit the configured section-context limit. |
+| **Current-section context** | Explain how the passage relates to the current section. | Current section title plus a cached generated synopsis for local or limited document-wide questions. The synopsis has a configured maximum length and is generated only from that section's bounded source text. A whole-section question receives the complete current section instead, which must fit the configured section-context limit. |
 | **Local passage context** | Ground a passage-level explanation in immediate surrounding prose. | Up to two preceding ordered paragraphs, the unchanged anchored paragraph, and one following ordered paragraph, when those paragraphs exist. Paragraphs are included whole and in source order; configured paragraph limits are enforced during deterministic processing rather than by prompt-time truncation. |
-| **Recent dialogue** | Make a follow-up coherent within the paused conversational episode. | The newest complete question-and-answer turns from the active episode, excluding the current question. The builder keeps only whole turns that fit configured maximum turn and character budgets; it never includes turns from another episode. Persisted interactions outside that bounded selection are not model context. |
+| **Full-document source** | Ground an explicit document-wide question in the complete uploaded work when it safely fits. | Every normalized section and paragraph exactly once in canonical section and paragraph order, with section, paragraph, and available page markers. It replaces, rather than duplicates, local and current-section source context. It is included only after deterministic whole-prompt budget validation. |
+| **Reading-session dialogue** | Preserve conversational continuity while the user alternates between reading and discussion. | Every complete question-and-answer turn from the active reading session, across both ended and active conversational episodes, excluding the current question. Turns are supplied in chronological order. V0 never silently drops, truncates, or summarizes a session turn. If the complete session dialogue plus required source context would exceed the configured model-input limit, the Ask is rejected clearly and the user is asked to begin a new reading session. |
 | **Current question** | State the user's request. | The complete transcript for the current request, subject to a configured input limit that produces a clear error rather than silent truncation. |
 
 The builder selects a scope by a simple, inspectable rule; it does not use a classifier or
 retrieval model:
 
 - **Local passage** is the default. It contains document orientation, current-section
-  synopsis, local passage context, bounded recent dialogue, and the current question.
+  synopsis, local passage context, complete active-session dialogue, and the current question.
 - **Current section** is used only when the question explicitly asks about the section or
   chapter as a whole. It contains document orientation, the full bounded current section,
-  bounded recent dialogue, and the current question.
-- **Limited book-wide** is used only when the question explicitly asks about the document
-  as a whole or where else something appears. It contains document orientation,
-  current-section synopsis, local passage context, bounded recent dialogue, and the
-  current question. It performs no book-wide search.
+  complete active-session dialogue, and the current question.
+- **Full document** is used only when the question explicitly asks about the document as a
+  whole or where else something appears *and* the complete required prompt fits the configured
+  budget. It contains document orientation, the canonical full-document source, complete
+  active-session dialogue, and the current question. It does not include a duplicate local
+  window or section synopsis.
+- **Limited document-wide** is used for the same explicit question forms when the full-document
+  package does not fit. It contains document orientation, current-section synopsis, local
+  passage context, complete active-session dialogue, and the current question. It performs no
+  book-wide search and is explicitly labeled as limited.
 
-For every follow-up, the builder retains the original anchored paragraph and adds dialogue
-only from the same active episode. Pressing **Continue Reading** ends that episode; the
-next Ask starts a new episode with a new anchor and no previous episode dialogue.
+Full-document eligibility is deterministic and model-call-free. Before selecting it, the builder
+serializes the exact candidate prompt, including system and prompt instructions, all labels and
+markers, orientation, canonical source, every complete active-session turn, and the complete
+current question. It measures that normalized candidate with the configured deterministic token
+estimator (or its conservative normalized-character equivalent). The candidate fits only when its
+estimated input is no greater than `model_context_limit - reserved_answer_tokens - safety_margin`.
+Character-mode enforcement converts that allowance with a configured conservative
+characters-per-token value and counts the actual normalized assembled text; PDF page and word
+counts are informational only. The builder never trims source text or dialogue to make this test
+pass. If even the selected limited package cannot fit with every session turn and the question,
+the Ask fails clearly and requires a new reading session.
+
+Canonical full-document serialization walks persisted sections by ascending section order and
+each section's paragraphs by ascending paragraph order. It emits each section marker and each
+paragraph marker and text once, retaining start/end page markers when available. This lossless
+ordered serialization is the entire supplied document; it is not retrieval, sampling, or a
+generated summary.
+
+Within one episode, every follow-up retains that episode's original anchored paragraph. Pressing
+**Continue Reading** ends the episode but not the reading session. A later Ask in the same reading
+session creates a new episode with a new anchor and still receives every complete earlier turn
+from that reading session. Dialogue from an ended reading session is not included in a new one.
 
 ### **Source authority and safe claims**
 
@@ -110,31 +141,43 @@ The model may say that the uploaded document states or implies something only wh
 supplied source text supports that statement. A generated section synopsis and the document
 map are orientation aids, not proof of a precise claim.
 
+Reading-session dialogue is conversational memory, not additional source evidence. The model may
+remember an earlier explanation or user preference from it, but a statement in an earlier answer
+does not prove that the uploaded document contains that statement. New claims about the source
+must remain grounded in source text supplied for the current request.
+
 The model may use general knowledge about an identified work or subject only as clearly
 labeled background. Background knowledge must not be presented as evidence from the
 uploaded document and must never override supplied source text. The model must not claim
 that a passage, theme, or argument appears elsewhere in the uploaded document unless the
 builder supplied that evidence.
 
-### **Book-wide limitation shown to the user**
+### **Document-wide answers and limitation shown to the user**
 
-V0 has no full-document retrieval. For a question such as “Where else in the book does he
-discuss this?”, it must say that it can discuss the current passage and section but cannot
-verify other locations in the uploaded document. It may offer a clearly labeled
-best-effort interpretation from the supplied orientation, section, and local context; it
-must not present that interpretation as a search result. Full-document retrieval comes later.
+For an explicit document-wide question such as “Where else in the book does he discuss this?”,
+V0 uses the complete normalized document only when the deterministic budget test passes. In that
+case, it may identify locations or make document-wide claims only when the supplied canonical
+source supports them, citing its supplied section, paragraph, or page markers where useful.
+
+When that complete package does not fit, V0 says it is answering in **limited document-wide
+context**: it examined the document orientation, current-section synopsis, local passage window,
+and complete active-session dialogue, but did not examine the complete document. It must not
+claim to have searched or analyzed the whole document, identify other locations as verified, or
+present a best-effort interpretation as a search result. Full-document retrieval/RAG remains
+deferred.
 
 ### **Question-type walkthrough**
 
-The initial benchmark evaluates these five question types against the contract:
+The initial benchmark evaluates these question types against the contract:
 
 | Question type | Selected scope | Grounding rule |
 | --- | --- | --- |
 | Explain a passage | Local passage | Explain from the anchor and local window; use the section synopsis only for context. |
 | Author intent | Local passage by default | Describe intent as an interpretation of supplied wording and section context, not as an unsupported fact about the author. |
 | Give an example | Local passage by default | Label a model-created or general-knowledge example as illustrative, not source text. |
-| Follow-up connection | Same scope selected for the follow-up, plus bounded same-episode dialogue | Preserve the original anchor and distinguish a supported connection from background interpretation. |
+| Follow-up connection | Same scope selected for the follow-up, plus complete active-session dialogue | Preserve the current episode's original anchor and distinguish a supported connection from background interpretation. |
 | Counterargument | Local passage by default | Separate the document's argument from a reasoned or background counterargument. |
+| Document-wide location or synthesis | Full document when its complete prompt fits; otherwise limited document-wide | Identify other locations or make cross-section claims only from the supplied canonical full-document source. In limited mode, clearly state the source layers examined and the whole-document limitation. |
 
 This contract requires only ordered persisted source text, deterministic scope selection,
 and bounded prompt assembly. It requires no embeddings, vector database, semantic search,
@@ -171,8 +214,8 @@ The AI response is read aloud.
 For V0, the user does **not** need to interrupt an answer while it is playing. That can
 come later. After the answer finishes, the user may ask a follow-up while reading
 remains paused. The follow-up stays in the same conversational episode, uses the
-original anchored paragraph as its reading position, and receives bounded recent dialogue
-as additional context.
+original anchored paragraph as its reading position, and receives the complete active reading
+session dialogue as additional context.
 
 ---
 
@@ -184,7 +227,9 @@ After one or more answers, the user presses:
 
 The document resumes from the original paragraph where they stopped. Continuing ends
 the active conversational episode; a later Ask begins a new one at the then-current
-paragraph. Exact sentence-level semantic resume is not required yet.
+paragraph. The reading session remains active, so the later Ask also receives all earlier
+question-and-answer turns from that session. Exact sentence-level semantic resume is not
+required yet.
 
 ---
 
@@ -204,7 +249,7 @@ Create document map
  ↓  
 Store
 
-Generate a short section synopsis lazily only when a local or limited book-wide question
+Generate a short section synopsis lazily only when a local or limited document-wide question
 needs it, then reuse that bounded synopsis for the section. A whole-section question uses
 the bounded section text itself.
 
@@ -237,18 +282,21 @@ A document can initially look like:
   \]  
 }
 
-The reading session only needs to remember:
+The active reading session remembers:
 
 {  
+  "reading_session_id": "session_1",
   "document\_id": "doc\_1",  
   "chapter\_index": 3,  
   "paragraph\_index": 12  
 }  
 
-While reading is paused, an active conversational episode additionally has one anchored
-paragraph and an ordered set of textual question-and-answer interactions. The episode
-ends when the user continues reading. Recent turns are selected from that episode only
-as bounded temporary reasoning context.
+Each time reading is paused for discussion, a conversational episode adds one immutable anchored
+paragraph and an ordered set of textual question-and-answer interactions. Continue ends that
+episode but retains it inside the active reading session. Every later reasoning request in the
+same reading session receives all complete interactions from all of its episodes in chronological
+order. If the whole required prompt no longer fits the configured limit, V0 asks the user to start
+a new session rather than silently omitting or summarizing earlier turns.
 ---
 
 # **Prompt Structure**
@@ -263,8 +311,14 @@ DOCUMENT:
 {title}  
 {author}
 
+CONTEXT SCOPE:
+{local passage | current section | full document | limited document-wide}
+
 DOCUMENT ORIENTATION:
 {title, author if available, document type, bounded ordered document map}
+
+FULL DOCUMENT SOURCE (full-document scope only; canonical source order):
+{each section and paragraph exactly once, with available markers}
 
 CURRENT CHAPTER:  
 {chapter\_title}
@@ -281,8 +335,8 @@ CURRENT PARAGRAPH:
 NEXT PARAGRAPH:  
 {next\_paragraph}
 
-RECENT DIALOGUE:
-{bounded\_recent\_question\_and\_answer\_turns\_from\_this\_episode}
+READING SESSION DIALOGUE:
+{all\_complete\_prior\_question\_and\_answer\_turns\_from\_this\_reading\_session}
 
 USER QUESTION:  
 {question}
@@ -297,8 +351,9 @@ When explaining a passage:
 \- distinguish clearly between what the text says and your interpretation;  
 \- label general knowledge and invented examples as background or illustration;
 \- do not claim that unsupported material appears elsewhere in the uploaded document;
-\- for a book-wide question, state that full-document retrieval is unavailable and do not
-  present a best-effort interpretation as a search result;
+\- for a full-document question, identify locations only when the supplied canonical full source
+  supports them; for limited document-wide context, state the layers examined and that the
+  complete document was not examined;
 \- do not invent claims unsupported by the provided context.  
 ---
 
@@ -361,7 +416,7 @@ chapters
 paragraphs  
 document maps and lazily cached section synopses
 reading position  
-conversation  
+reading sessions and conversational episodes
 textual question-and-answer interactions
 ---
 
@@ -373,8 +428,8 @@ V0 does **not** include:
 * multi-agent systems;  
 * embeddings;  
 * vector databases;  
-* full-document RAG;  
-* long-term conversation or learner memory;
+* full-document RAG or retrieval beyond the bounded canonical full-document scope;
+* cross-session conversation recall or learner memory;
 * personalized knowledge graphs;  
 * external web research;  
 * cross-book connections;  
@@ -412,6 +467,9 @@ Does:
 
 feel substantially better than manually switching between a reader and ChatGPT?
 
+Does the interaction still feel continuous after the reader resumes narration, reaches another
+passage, and asks a question that refers to an earlier discussion from the same reading session?
+
 ---
 
 # **Definition of Done**
@@ -430,9 +488,13 @@ V0 is done when I can:
 9. receive an explanation that understands both the paragraph and the chapter context;  
 10. hear that explanation naturally;  
 11. ask at least one follow-up question while reading remains paused;
-12. receive and hear a follow-up answer that uses the original anchored passage and recent dialogue;
+12. receive and hear a follow-up answer that uses the original anchored passage and active-session dialogue;
 13. press **Continue**;
-14. keep listening from the original anchored paragraph.
+14. keep listening from the original anchored paragraph;
+15. pause later in the same reading session at a different paragraph;
+16. ask a question that refers to the earlier conversation;
+17. receive an answer that uses the complete earlier session dialogue while grounding new source
+    claims in the newly anchored passage and its selected context.
 
 At that point, stop building features and use the product on a real difficult book.
 

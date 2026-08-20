@@ -236,18 +236,170 @@ The product and engineering baseline is internally consistent and ready for impl
   architecture's `ConversationEpisode`, ordered `Interaction` turns, bounded recent dialogue,
   and Continue route.
 
+The same-episode-only dialogue boundary recorded above was the approved baseline at the time of
+M0-T05 and is superseded by M0-T06.
+
+## M0-T06 — Carry conversation across a reading session
+
+**Status:** Done
+**Depends on:** M0-T05
+
+### Outcome
+
+V0 preserves conversational continuity across multiple pause-and-discuss episodes within the
+same reading session.
+
+### Scope
+
+- Define a reading session that spans narration and multiple conversational episodes.
+- Include every complete prior interaction from the active reading session in each reasoning
+  request, including interactions from ended episodes.
+- Keep a distinct immutable paragraph anchor for each conversational episode.
+- Define explicit context-limit behavior without silently dropping or summarizing session turns.
+- Align the RFC, architecture, roadmap, benchmark, backlog, and engineering instructions.
+
+### Out of scope
+
+- Carrying dialogue from an ended reading session into a new session.
+- Summarizing or retrieving older conversations.
+- Cross-document context or a persistent learner model.
+- Application implementation.
+
+### Acceptance criteria
+
+- Continue ends only the active conversational episode; it does not erase or exclude earlier
+  dialogue from the current reading session.
+- A later Ask in the same reading session receives all complete earlier session interactions in
+  chronological order plus the current episode's turns.
+- V0 never silently truncates or summarizes session dialogue; it rejects a question that would
+  exceed the configured session-context limit and asks the user to begin a new session.
+- The persisted model distinguishes reading sessions, conversational episodes, and interactions.
+- The benchmark contains a cross-episode continuity sequence.
+- Long-term and cross-session memory remain explicitly deferred.
+
+### Verification
+
+- Search all planning documents for conflicting same-episode-only language.
+- Trace a session through Ask, follow-up, Continue, more reading, a new Ask, and a reference to an
+  earlier answer.
+
+### Completion review
+
+- The RFC now defines a `ReadingSession` that survives Continue and contains multiple independently
+  anchored conversational episodes.
+- The architecture persists `ReadingSession → ConversationEpisode → Interaction`, supplies every
+  complete earlier session turn in deterministic order, and exposes explicit session lifecycle
+  operations.
+- Session dialogue is conversational memory but not source evidence; new claims about the document
+  still require source text supplied for the current request.
+- V0 fails clearly rather than dropping or summarizing session turns when the complete prompt would
+  exceed its configured model-input limit.
+- Benchmark sequence S3 covers Ask, Continue, more reading, a new anchor, and a reference to an
+  earlier answer from an ended episode in the same session.
+- The roadmap keeps cross-session recall, automatic compaction, and learner memory in the post-V0/V2
+  idea stash.
+
+## M0-T07 — Add bounded full-document question scope
+
+**Status:** Done
+**Depends on:** M0-T06
+
+### Outcome
+
+V0 answers document-wide questions from the complete normalized document when the document and
+required active-session context fit safely within the configured reasoning-model input budget.
+Oversized documents use an explicitly limited context mode rather than a categorical V0 denial or
+an unsupported claim of whole-document analysis.
+
+### Scope
+
+- Add a full-document context scope for explicit document-wide questions when the complete prompt
+  fits.
+- Define eligibility from the configured model-context limit, reserved answer tokens, system and
+  prompt instructions, the complete active reading-session dialogue, the current question, and a
+  safety margin.
+- Use normalized token or conservative extracted-character size for enforcement rather than PDF
+  page count; page and word counts may be informational only.
+- Assemble every section and paragraph exactly once in canonical source order, retaining section,
+  paragraph, and page markers where available.
+- Preserve the requirement that every complete earlier interaction from the active reading session
+  remains in context.
+- Retain a clearly labeled limited document-wide scope when the full document does not fit.
+- Align the RFC, architecture, roadmap, benchmark, backlog dependencies, and engineering
+  instructions.
+- Add benchmark coverage for a fitting document-wide question and an over-limit document.
+
+### Out of scope
+
+- Embeddings, vector databases, semantic retrieval, or full-document RAG.
+- Silently truncating, sampling, or summarizing source text to make a document fit.
+- Silently dropping or summarizing active-session dialogue.
+- Precise document-wide claims when the complete document was not supplied.
+- Choosing a permanent page-count threshold before capability and latency measurements.
+- Application implementation.
+
+### Acceptance criteria
+
+- An explicit document-wide question selects full-document scope when the complete required prompt
+  fits the configured input budget.
+- Full-document scope supplies the normalized source exactly once, without gaps, overlap,
+  reordering, or silent truncation.
+- Complete active-session dialogue remains included when determining whether full-document scope
+  fits.
+- The budget calculation reserves configured answer capacity and a safety margin and is
+  deterministic and testable without a model call.
+- When the full prompt does not fit, the product states what context it did and did not examine and
+  does not imply that it searched or analyzed the complete document.
+- Questions such as “Where else does this appear?” may identify locations only when the supplied
+  full-document source supports them.
+- The benchmark includes one answer requiring evidence from multiple sections of a fitting
+  document and one over-limit case that verifies honest fallback behavior.
+- Retrieval infrastructure remains explicitly deferred.
+
+### Verification
+
+- Trace an under-budget document-wide question through scope selection, canonical prompt assembly,
+  answer generation, and source-authority rules.
+- Trace an over-budget document-wide question and confirm that neither source text nor session
+  dialogue is silently omitted.
+- Search the planning documents for categorical V0 denials that conflict with the new conditional
+  capability.
+- Confirm that the revised contract introduces no embeddings, vector storage, or hidden retrieval.
+
+### Completion review
+
+- The RFC now selects full-document scope for an explicit document-wide question only when the
+  exact canonical-source candidate, instructions, complete reading-session dialogue, and current
+  question fit a deterministic budget after reserved answer capacity and safety margin.
+- The canonical package serializes every normalized section and paragraph exactly once in source
+  order with available section, paragraph, and page markers. It replaces rather than duplicates
+  local or section source context.
+- An over-budget request selects clearly labeled limited document-wide context. It states the
+  supplied layers and that it did not examine the complete document; it neither searches nor
+  claims verified document-wide locations. An over-limit limited package still fails explicitly
+  rather than omitting session dialogue.
+- Architecture invariants and tests now require model-call-free budget calculation, lossless
+  canonical serialization, preserved complete session dialogue, and source-authority guardrails.
+- Benchmark B6 exercises a fitting multi-section question; B7 verifies honest fallback under an
+  over-limit capability profile. Full-document retrieval/RAG, embeddings, vector storage, and
+  hidden retrieval remain deferred.
+
 ---
 
 # M1 — Application foundation and capability validation
 
 ## M1 sequencing
 
-M1 begins after M0-T05. Capability spikes should resolve external uncertainty before the related integrations are used by the application. Scaffolding tickets may then establish the web/API boundary and persistence foundation. Fake capability operations provide deterministic development and testing seams; real provider integration belongs to later milestones unless a spike explicitly requires a live call.
+M1 begins after M0-T07. Capability spikes should resolve external uncertainty before the related
+integrations are used by the application. Scaffolding tickets may then establish the web/API
+boundary and persistence foundation. Fake capability operations provide deterministic development
+and testing seams; real provider integration belongs to later milestones unless a spike explicitly
+requires a live call.
 
 ## M1-T01 — Define the repository layout and local developer workflow
 
 **Status:** Ready
-**Depends on:** M0-T05
+**Depends on:** M0-T07
 
 ### Outcome
 
@@ -386,7 +538,7 @@ The selected TTS endpoint can produce acceptable MP3 narration for both source p
 ## M1-T05 — Spike reasoning quality with the context contract
 
 **Status:** Backlog  
-**Depends on:** M0-T02, M0-T04, M1-T01
+**Depends on:** M0-T02, M0-T04, M0-T06, M0-T07, M1-T01
 
 ### Outcome
 
@@ -394,8 +546,8 @@ The selected reasoning model can answer benchmark questions usefully and remain 
 
 ### Scope
 
-- Construct representative local, section, document-orientation, and dialogue context packages.
-- Run the primary benchmark questions and follow-up sequences.
+- Construct representative local, section, fitting full-document, limited document-wide, and dialogue context packages.
+- Run the primary benchmark questions, same-episode follow-ups, and the cross-episode reading-session sequence.
 - Observe answer quality, grounding, depth, latency, and prompt-size behavior.
 - Record prompt adjustments required for implementation.
 
@@ -408,9 +560,9 @@ The selected reasoning model can answer benchmark questions usefully and remain 
 ### Acceptance criteria
 
 - Local explanations correctly use the anchored passage and section context.
-- Follow-up answers make coherent use of recent dialogue.
+- Follow-up and later-episode answers make coherent use of every earlier turn from the active reading session.
 - The model distinguishes supplied text from general background knowledge.
-- Unsupported book-wide claims are refused or qualified.
+- Document-wide claims are grounded when canonical full-document source is supplied and otherwise refused or clearly qualified as limited context.
 - Material quality or latency risks are documented before M3 implementation.
 
 ### Verification
@@ -562,15 +714,15 @@ The API has a tested local persistence foundation with repeatable schema migrati
 ## M1-T10 — Add the initial persisted domain schema
 
 **Status:** Backlog  
-**Depends on:** M0-T03, M1-T09
+**Depends on:** M0-T03, M0-T06, M1-T09
 
 ### Outcome
 
-The database represents the minimum V0 document, reading, interaction, and conversational-episode state agreed in the architecture.
+The database represents the minimum V0 document, reading-session, conversational-episode, and interaction state agreed in the architecture.
 
 ### Scope
 
-- Add `Document`, `Section`, `Paragraph`, `ConversationEpisode`, and `Interaction` tables.
+- Add `Document`, `Section`, `Paragraph`, `ReadingSession`, `ConversationEpisode`, and `Interaction` tables.
 - Add ordering, ownership, status, timestamps, and reading-position fields required by V0.
 - Add foreign keys and uniqueness constraints that enforce stable ordering and ownership.
 - Create the migration and focused persistence tests.
@@ -585,7 +737,9 @@ The database represents the minimum V0 document, reading, interaction, and conve
 ### Acceptance criteria
 
 - The schema supports ordered sections and paragraphs without duplicated ownership fields.
-- An interaction can be ordered within a conversational episode and anchored to a paragraph.
+- Reading sessions and their conversational episodes have deterministic order.
+- An interaction can be ordered within an episode, included in chronological session context, and anchored through its episode to a paragraph.
+- At most one reading session per document and one episode per session can be active.
 - A document can store one current reading position.
 - Processing states and retry-related failure fields match the architecture.
 - The migration applies cleanly to a fresh database and tests cover key constraints.
