@@ -606,7 +606,7 @@ A short browser-compatible recording can be accepted by the selected transcripti
 
 ## M1-T04 — Spike narration and answer TTS quality
 
-**Status:** Ready
+**Status:** Done
 **Depends on:** M0-T05, M1-T01
 
 ### Outcome
@@ -643,7 +643,7 @@ The selected TTS endpoint can produce acceptable MP3 narration for both source p
 
 ## M1-T05 — Spike reasoning quality with the context contract
 
-**Status:** Backlog  
+**Status:** Ready
 **Depends on:** M0-T02, M0-T04, M0-T06, M0-T07, M0-T08, M1-T01
 
 ### Outcome
