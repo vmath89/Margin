@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Margin M1-T03 MediaRecorder capture</title>
+  </head>
+  <body>
+    <main>
+      <h1>Margin M1-T03 MediaRecorder capture</h1>
+      <p>
+        Re-encode the local benchmark utterance through this browser's MediaRecorder and save the
+        resulting WebM/Opus blob to the ticket's ignored spike directory.
+      </p>
+      <button id="capture" type="button">Capture benchmark utterance</button>
+      <pre id="status">Ready.</pre>
+    </main>
+    <script>
+      const mimeType = "audio/webm;codecs=opus";
+      const button = document.querySelector("#capture");
+      const status = document.querySelector("#status");
+
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            throw new Error(`${mimeType} is not supported by this browser`);
+          }
+          status.textContent = "Loading benchmark audio…";
+          const sourceBytes = await fetch("/fixture.webm").then((response) => {
+            if (!response.ok) throw new Error(`fixture request failed: ${response.status}`);
+            return response.arrayBuffer();
+          });
+          const context = new AudioContext();
+          await context.resume();
+          const sourceBuffer = await context.decodeAudioData(sourceBytes);
+          const source = context.createBufferSource();
+          const destination = context.createMediaStreamDestination();
+          source.buffer = sourceBuffer;
+          source.connect(destination);
+
+          const chunks = [];
+          const recorder = new MediaRecorder(destination.stream, { mimeType });
+          recorder.addEventListener("dataavailable", (event) => {
+            if (event.data.size > 0) chunks.push(event.data);
+          });
+          const stopped = new Promise((resolve) =>
+            recorder.addEventListener("stop", resolve, { once: true }),
+          );
+          source.addEventListener("ended", () => recorder.stop(), { once: true });
+
+          status.textContent = "Recording through MediaRecorder…";
+          recorder.start(250);
+          source.start();
+          await stopped;
+          await context.close();
+
+          const blob = new Blob(chunks, { type: recorder.mimeType });
+          const response = await fetch("/capture", {
+            method: "POST",
+            headers: {
+              "Content-Type": blob.type,
+              "X-Browser-User-Agent": navigator.userAgent,
+            },
+            body: blob,
+          });
+          if (!response.ok) throw new Error(`capture upload failed: ${response.status}`);
+          const result = await response.json();
+          status.textContent = JSON.stringify(result, null, 2);
+        } catch (error) {
+          status.textContent = `Error: ${error.message}`;
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

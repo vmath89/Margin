@@ -570,7 +570,7 @@ The chosen PDF libraries can extract usable metadata, outline information, layou
 
 ## M1-T03 — Spike browser recording and transcription compatibility
 
-**Status:** Ready
+**Status:** Done
 **Depends on:** M0-T05, M1-T01
 
 ### Outcome
@@ -606,7 +606,7 @@ A short browser-compatible recording can be accepted by the selected transcripti
 
 ## M1-T04 — Spike narration and answer TTS quality
 
-**Status:** Backlog  
+**Status:** Ready
 **Depends on:** M0-T05, M1-T01
 
 ### Outcome
