@@ -1,8 +1,8 @@
 # Margin local development
 
 This document defines the repository and command conventions for the V0 application. M1-T01
-establishes the contract; later M1 tickets create the application files and make each command
-executable. Until those tickets land, this repository intentionally remains planning-only.
+established the contract, and M1-T06 created the FastAPI application. Later M1 tickets create the
+remaining application files and make their owning commands executable.
 
 ## Repository layout
 
@@ -62,6 +62,14 @@ later ticket demonstrates a shared-code need.
 Backend settings live in `apps/api/.env`, created locally from `apps/api/.env.example` once M1-T06
 adds it. OpenRouter credentials and all provider/context settings are backend-only. They must not
 use a `NEXT_PUBLIC_` prefix, appear in frontend environment files, or be returned by an API route.
+
+The committed API example records the measured M1 defaults for model IDs, recording duration,
+context-budget inputs, and TTS settings. Local paths and database behavior also have typed settings,
+although M1-T09 owns the database integration. The API validates all configured values at startup.
+`OPENROUTER_API_KEY` is intentionally optional until a provider-backed operation is invoked; that
+operation must fail with the stable configuration-error response when the key is absent. The audio
+cache version is derived from every byte-affecting TTS setting, so changing any of those settings
+selects a new cache namespace automatically.
 
 The web app should need no browser-visible secret. If M1-T08 requires a configurable development
 rewrite target, it belongs in `apps/web/.env.local` as a server-only value and its safe placeholder

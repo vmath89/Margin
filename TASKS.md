@@ -715,7 +715,7 @@ The selected reasoning model can answer benchmark questions usefully and remain 
 
 ## M1-T06 — Scaffold the FastAPI application
 
-**Status:** Ready
+**Status:** Done
 **Depends on:** M1-T01
 
 ### Outcome
@@ -755,7 +755,7 @@ A minimal FastAPI application starts locally, loads validated configuration, and
 
 ## M1-T07 — Scaffold the Next.js application
 
-**Status:** Backlog  
+**Status:** Ready
 **Depends on:** M1-T01
 
 ### Outcome
