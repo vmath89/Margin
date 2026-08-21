@@ -30,9 +30,10 @@ not a representative sample of image-only, encrypted, malformed, or general arbi
 ### Text-extraction inspection
 
 On 2026-08-19, the official PDF was inspected with `pypdf`'s native text extraction only—no OCR
-was invoked. The 20-page PDF yielded 58,237 characters and correctly exposed the Preamble,
-Articles, numbered sections, and Amendments in source order. The selected passages below were
-manually inspected in the extract:
+was invoked. M1-T02 subsequently pinned the extraction libraries and measured the same 20-page PDF
+reproducibly: 58,267 raw `pypdf` layout characters and a 47,727-character normalized paragraph
+corpus. It correctly exposed the Preamble, Articles, numbered sections, and Amendments in source
+order. The selected passages below were manually inspected in the extract:
 
 | Passage | Locator in PDF | Manual inspection result | Difficulty |
 | --- | --- | --- | --- |
@@ -68,7 +69,7 @@ orientation aids, not evidence for a precise claim.
 ### Document-wide budget profiles
 
 B6 uses a fitting capability profile: the deterministic estimator must show that the exact prompt
-containing this 58,237-character normalized document, its static instructions and markers, the
+containing this 47,727-character normalized document, its static instructions and markers, the
 complete active-session dialogue, question, configured answer reserve, and safety margin fits the
 configured input limit. Page count is never the decision rule.
 

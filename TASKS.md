@@ -521,7 +521,7 @@ The repository has an agreed structure and one documented procedure for setting 
 
 ## M1-T02 — Spike extraction against the selected PDF
 
-**Status:** Ready
+**Status:** Done
 **Depends on:** M0-T04, M1-T01
 
 ### Outcome
@@ -570,7 +570,7 @@ The chosen PDF libraries can extract usable metadata, outline information, layou
 
 ## M1-T03 — Spike browser recording and transcription compatibility
 
-**Status:** Backlog  
+**Status:** Ready
 **Depends on:** M0-T05, M1-T01
 
 ### Outcome
