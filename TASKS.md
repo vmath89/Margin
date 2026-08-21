@@ -643,7 +643,7 @@ The selected TTS endpoint can produce acceptable MP3 narration for both source p
 
 ## M1-T05 — Spike reasoning quality with the context contract
 
-**Status:** Ready
+**Status:** Done
 **Depends on:** M0-T02, M0-T04, M0-T06, M0-T07, M0-T08, M1-T01
 
 ### Outcome
@@ -696,9 +696,26 @@ The selected reasoning model can answer benchmark questions usefully and remain 
 - Recalculate at least one fitting and one over-budget decision independently from the recorded
   inputs.
 
+### Completion review
+
+- `docs/spikes/m1-t05_reasoning.py` reproducibly assembles local, complete current-section,
+  canonical full-document, limited document-wide, and complete session-dialogue packages from the
+  checksum-pinned Constitution extraction.
+- Live B1–B7 and S1–S3 evaluation with `openai/gpt-5.6-sol` passed the benchmark grounding,
+  usefulness, depth, and continuity expectations. An initial B7 disclosure omitted an explicit
+  empty-dialogue statement; the refined guardrail and rerun name all four limited layers and the
+  complete-document limitation.
+- B6's final exact candidate is 55,680 characters and 12,845 `o200k_base` tokens. It fits the
+  128,000-token capability profile after a 4,096-token answer reserve and 2,048-token safety margin.
+  The same estimators reproducibly reject B7's 55,533-character full candidate under the 16,000-token
+  over-limit profile and accept its complete 5,190-character limited package without trimming.
+- The spike report records the prompt contract, initial configuration, independent fit arithmetic,
+  manual evaluations, actual token/cost/latency measurements, the representative B7 refinement, and
+  M3 risks. Generated prompts and answers remain ignored under `var/`.
+
 ## M1-T06 — Scaffold the FastAPI application
 
-**Status:** Backlog  
+**Status:** Ready
 **Depends on:** M1-T01
 
 ### Outcome

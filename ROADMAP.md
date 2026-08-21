@@ -60,7 +60,7 @@ M0-T08 adds deterministic start and flat section navigation; richer navigation r
 
 ### M1 — Application foundation and capability validation
 
-**Status:** In progress (`M1-T01` through `M1-T04` are Done; `M1-T05` is Ready.)
+**Status:** In progress (`M1-T01` through `M1-T05` are Done; `M1-T06` is Ready.)
 
 **Outcome:** The web and API applications run locally, persist basic domain data, communicate through a stable boundary, and have verified seams for PDF extraction and model capabilities.
 
