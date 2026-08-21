@@ -486,7 +486,7 @@ upload, reader, navigation UI, narration, or Ask behavior.
 
 ## M1-T01 — Define the repository layout and local developer workflow
 
-**Status:** Ready
+**Status:** Done
 **Depends on:** M0-T08
 
 ### Outcome
@@ -521,7 +521,7 @@ The repository has an agreed structure and one documented procedure for setting 
 
 ## M1-T02 — Spike extraction against the selected PDF
 
-**Status:** Backlog  
+**Status:** Ready
 **Depends on:** M0-T04, M1-T01
 
 ### Outcome

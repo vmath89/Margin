@@ -1,0 +1,29 @@
+# Environment files may contain credentials or machine-local configuration.
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Python tooling and test output.
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.coverage
+**/htmlcov/
+
+# Node.js and Next.js output.
+**/node_modules/
+**/.next/
+**/coverage/
+**/playwright-report/
+**/test-results/
+
+# Margin runtime data. The directory name is reserved by DEVELOPMENT.md.
+/var/
+
+# Common local editor and operating-system files.
+.DS_Store
+.idea/
+.vscode/

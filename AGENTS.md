@@ -88,19 +88,33 @@ Do not introduce these without a new approved requirement:
 
 ## Repository and command conventions
 
-The application layout, runtime versions, package managers, and commands will be established by M1-T01. Until then, do not invent commands or create application directories outside that ticket.
+`DEVELOPMENT.md` defines the repository layout, local environment handling, ports, and contributor
+procedure. Use CPython 3.12 with `uv` for `apps/api` and Node.js 22 with Corepack-managed pnpm 10
+for `apps/web`. Run commands from the repository root.
 
-Once established, keep this section updated with the authoritative commands for:
+The canonical command contract is:
 
-- environment setup;
-- starting the web application;
-- starting the API application;
-- applying database migrations;
-- backend tests;
-- frontend tests;
-- linting;
-- type checking;
-- end-to-end verification.
+- backend setup: `uv sync --project apps/api --all-groups`;
+- start API: `uv run --project apps/api uvicorn margin_api.main:app --reload --port 8000`;
+- backend tests: `uv run --project apps/api pytest apps/api/tests`;
+- backend lint: `uv run --project apps/api ruff check apps/api`;
+- backend type checking: `uv run --project apps/api mypy apps/api/src`;
+- frontend setup: `pnpm --dir apps/web install --frozen-lockfile`;
+- start web: `pnpm --dir apps/web dev --port 3000`;
+- frontend tests: `pnpm --dir apps/web test`;
+- frontend lint: `pnpm --dir apps/web lint`;
+- frontend type checking: `pnpm --dir apps/web typecheck`;
+- apply migrations: `uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head`;
+- end-to-end verification: `pnpm --dir apps/web exec playwright test ../../tests/e2e`.
+
+Commands become executable when their owning M1 ticket creates the relevant application files;
+until then, do not scaffold them outside the selected ticket. If an implementing ticket must
+change a command, update both this index and `DEVELOPMENT.md` in the same change.
+
+Local development uses Next.js at `http://127.0.0.1:3000` and one FastAPI worker at
+`http://127.0.0.1:8000`. The browser uses the web origin and same-origin `/api` routing. Store all
+repository-local runtime state under ignored `var/`. Keep backend secrets in ignored
+`apps/api/.env`, never in frontend variables or browser-visible responses.
 
 Never commit API keys, recordings, uploaded documents containing private material, local databases, or generated audio caches.
 
