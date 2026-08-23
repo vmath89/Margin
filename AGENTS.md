@@ -99,17 +99,22 @@ The canonical command contract is:
 - backend tests: `uv run --project apps/api pytest apps/api/tests`;
 - backend lint: `uv run --project apps/api ruff check apps/api`;
 - backend type checking: `uv run --project apps/api mypy apps/api/src`;
-- frontend setup: `pnpm --dir apps/web install --frozen-lockfile`;
-- start web: `pnpm --dir apps/web dev --port 3000`;
-- frontend tests: `pnpm --dir apps/web test`;
-- frontend lint: `pnpm --dir apps/web lint`;
-- frontend type checking: `pnpm --dir apps/web typecheck`;
+- frontend setup: `(cd apps/web && pnpm install --frozen-lockfile)`;
+- start web: `(cd apps/web && pnpm dev --port 3000)`;
+- frontend tests: `(cd apps/web && pnpm test)`;
+- frontend lint: `(cd apps/web && pnpm lint)`;
+- frontend type checking: `(cd apps/web && pnpm typecheck)`;
 - apply migrations: `uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head`;
-- end-to-end verification: `pnpm --dir apps/web exec playwright test ../../tests/e2e`.
+- end-to-end verification: `(cd apps/web && pnpm exec playwright test ../../tests/e2e)`.
 
 Commands become executable when their owning M1 ticket creates the relevant application files;
 until then, do not scaffold them outside the selected ticket. If an implementing ticket must
 change a command, update both this index and `DEVELOPMENT.md` in the same change.
+
+For the M1 integration gate, follow the complete ordered procedure in `DEVELOPMENT.md` under
+“M1 integrated verification baseline.” It installs locked dependencies, migrates an isolated
+ignored database, runs every automated check, and verifies the browser-to-API health route through
+the Next.js same-origin rewrite. Live provider checks remain explicit and opt-in.
 
 Local development uses Next.js at `http://127.0.0.1:3000` and one FastAPI worker at
 `http://127.0.0.1:8000`. The browser uses the web origin and same-origin `/api` routing. Store all

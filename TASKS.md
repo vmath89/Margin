@@ -945,7 +945,7 @@ Application services and future end-to-end tests can exercise reasoning, transcr
 
 ## M1-T12 — Establish the integrated verification baseline
 
-**Status:** Backlog  
+**Status:** Done
 **Depends on:** M1-T02, M1-T03, M1-T04, M1-T05, M1-T08, M1-T09, M1-T10, M1-T11
 
 ### Outcome
@@ -994,6 +994,185 @@ The application foundation has a documented, repeatable verification procedure a
 
 ---
 
+# M2 — PDF reader and narration
+
+M2 is decomposed from the completed M1 extraction, recording, TTS, persistence, and same-origin
+evidence. The scope remains limited to the selected supported text-based PDF and fake capability
+operations in normal automated tests. M3 owns spoken questions and reasoning context.
+
+## M2-T01 — Build the deterministic selected-PDF processing pipeline
+
+**Status:** Ready
+**Depends on:** M1-T12
+
+### Outcome
+
+The API can turn the supported checksum-pinned text PDF into one lossless ordered stream of
+sections and paragraphs suitable for persistence and reader navigation.
+
+### Scope
+
+- Turn the M1-T02 selected-PDF extraction rules into deterministic, testable application code.
+- Preserve source order, paragraph ownership, page markers, detected/fallback section markers, and
+  one first paragraph for every section.
+- Apply an explicit selected-document policy for small and oversized sections without duplicating,
+  omitting, or reordering source paragraphs.
+- Add focused fixtures and regression tests for the known signature-page reading-order and
+  normalization constraints.
+
+### Out of scope
+
+- Upload endpoints, persistence, browser UI, narration, OCR, and generalized arbitrary-PDF or
+  multi-column support.
+
+### Acceptance criteria
+
+- The checksum-pinned Constitution PDF produces a deterministic ordered document map, sections,
+  and paragraphs.
+- Canonical traversal consumes every retained paragraph exactly once in source order.
+- The known PDF page 11 signature layout cannot regress to cross-column artifacts.
+- Unsupported source conditions fail clearly rather than silently corrupting text.
+
+### Verification
+
+- Run focused deterministic parsing and normalization tests.
+- Re-run the M1-T02 spike self-test against the selected pinned PDF when its fixture is available.
+
+## M2-T02 — Persist uploaded-document preparation and state
+
+**Status:** Backlog
+**Depends on:** M2-T01
+
+### Outcome
+
+A user can submit the supported PDF and observe a persisted document preparation result backed by
+the ordered output from M2-T01.
+
+### Scope
+
+- Add the narrow same-origin upload and processing API needed for one supported PDF.
+- Persist source ownership, document status, document map, sections, paragraphs, and initial
+  reading position using the existing schema.
+- Return explicit validation and processing failures without exposing local paths or credentials.
+- Add deterministic API and temporary-database coverage.
+
+### Out of scope
+
+- OCR, broad PDF compatibility, background queues, model calls, reader controls, and narration.
+
+### Acceptance criteria
+
+- A supported upload enters visible preparation states and produces the persisted ordered hierarchy.
+- Invalid, image-only, and unsupported inputs fail clearly without partial authoritative data.
+- The persisted first paragraph becomes the document's initial reading position.
+
+### Verification
+
+- Run API upload/processing tests with temporary databases and the selected fixture.
+- Verify migration-backed persistence against a fresh database.
+
+## M2-T03 — Expose deterministic reader start and navigation state
+
+**Status:** Backlog
+**Depends on:** M2-T02
+
+### Outcome
+
+The API exposes the reader's persisted position and the RFC's three deterministic pre-narration
+starts: resume, beginning, and an ordered section.
+
+### Scope
+
+- Add explicit API operations to read reader state and select resume, beginning, or a section's
+  first paragraph.
+- Validate document membership and invalid/missing section or paragraph choices.
+- Preserve source order and persist only the resolved paragraph position.
+- Add state-transition tests for valid and invalid selections.
+
+### Out of scope
+
+- Conversational episodes, question handling, browser playback, backward playback control, and
+  generated audio.
+
+### Acceptance criteria
+
+- Every returned section includes its stable ID, title, source order, and first paragraph ID.
+- Resume, beginning, and section selection resolve deterministically and persist the selected
+  paragraph.
+- Cross-document, missing, and malformed selections fail clearly.
+
+### Verification
+
+- Run focused API state-transition tests against an isolated migrated database.
+
+## M2-T04 — Add on-demand paragraph narration and reader controls
+
+**Status:** Backlog
+**Depends on:** M2-T03
+
+### Outcome
+
+The reader API can obtain disposable paragraph audio, prefetch the next paragraph, and preserve its
+position through narration controls using the fake speech operation in automated tests.
+
+### Scope
+
+- Add the minimal narration service and API contracts for current/next paragraph audio and
+  persisted reading position updates.
+- Use the M1 audio-cache version inputs for disposable cache addressing and validate generated
+  audio before publishing it.
+- Define explicit retryable/non-retryable narration errors without moving position on failure.
+- Add focused fake-capability and persistence tests.
+
+### Out of scope
+
+- Real provider integration, answer audio, spoken questions, and browser UI.
+
+### Acceptance criteria
+
+- Current paragraph audio is generated or reused deterministically and the next paragraph can be
+  prefetched.
+- Failed generation leaves the persisted reading position unchanged and exposes a clear error.
+- Cache keys change when byte-affecting TTS configuration changes.
+
+### Verification
+
+- Run narration service tests with deterministic fake speech and isolated local cache paths.
+
+## M2-T05 — Deliver the browser PDF-reader and narration slice
+
+**Status:** Backlog
+**Depends on:** M2-T03, M2-T04
+
+### Outcome
+
+A user can upload the supported PDF, choose a start, listen paragraph by paragraph, use reader
+controls, navigate by section, and return after a page reload to the persisted anchor.
+
+### Scope
+
+- Build the minimal same-origin browser UI for upload/processing state, ordered sections, active
+  paragraph, narration, pause, previous paragraph, playback speed, section navigation, and resume.
+- Ensure section selection pauses playback and persists the selected section's first paragraph.
+- Add high-value browser and cross-boundary tests using fake operations.
+
+### Out of scope
+
+- Ask, transcription, reasoning, answers, conversational episodes, and live providers.
+
+### Acceptance criteria
+
+- The complete M2 outcome and every M2 exit criterion in `ROADMAP.md` are demonstrable on the
+  selected supported PDF.
+- Browser requests use only same-origin `/api` routes and expose no provider credentials.
+- A reload resumes the persisted reading position.
+
+### Verification
+
+- Run backend, frontend, lint, and type checks.
+- Exercise the reader in a real browser and inspect runtime and console errors.
+
 # Later milestones
 
-M2 through M5 are intentionally not decomposed yet. Their outcomes and exit criteria live in `ROADMAP.md`. Create their implementation-ready tickets near the end of the preceding milestone, using evidence from completed work and keeping the same ticket template.
+M3 through M5 remain outcome-level plans in `ROADMAP.md`. Decompose each near the end of its
+preceding milestone, using evidence from the completed implementation rather than speculative work.
