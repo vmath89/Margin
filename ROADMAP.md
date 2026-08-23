@@ -60,7 +60,7 @@ M0-T08 adds deterministic start and flat section navigation; richer navigation r
 
 ### M1 — Application foundation and capability validation
 
-**Status:** In progress (`M1-T01` through `M1-T08` are Done.)
+**Status:** Complete (`M1-T01` through `M1-T12` are Done.)
 
 **Outcome:** The web and API applications run locally, persist basic domain data, communicate through a stable boundary, and have verified seams for PDF extraction and model capabilities.
 
@@ -81,7 +81,7 @@ M0-T08 adds deterministic start and flat section navigation; richer navigation r
 
 ### M2 — PDF reader and narration
 
-**Status:** Not started; decompose near M1 completion.
+**Status:** Ready to begin with `M2-T01`; later tickets remain dependency-gated in `TASKS.md`.
 
 **Outcome:** A user can upload the selected supported PDF, choose where to begin, listen paragraph by paragraph, pause, navigate by section or backward, and resume from a persisted anchor.
 
@@ -176,4 +176,4 @@ decision promotes them into this roadmap and creates actionable work in `TASKS.m
 
 ## Planning horizon
 
-Only M0 and M1 are decomposed into implementation-ready tickets in `TASKS.md`. Later milestones remain outcome-level plans until discoveries from the preceding milestone make responsible decomposition possible.
+M0 through M2 are decomposed into implementation-ready tickets in `TASKS.md`. M3 through M5 remain outcome-level plans until discoveries from the preceding milestone make responsible decomposition possible.

@@ -1,8 +1,7 @@
 # Margin local development
 
-This document defines the repository and command conventions for the V0 application. M1-T01
-established the contract, and M1-T06 created the FastAPI application. Later M1 tickets create the
-remaining application files and make their owning commands executable.
+This document defines the repository and command conventions for the V0 application. M1-T12
+established the integrated verification baseline for the completed application foundation.
 
 ## Repository layout
 
@@ -114,30 +113,107 @@ ticket is shown because they are intentionally unavailable in the current planni
 | Run backend tests | `uv run --project apps/api pytest apps/api/tests` | M1-T06 |
 | Backend lint | `uv run --project apps/api ruff check apps/api` | M1-T06 |
 | Backend type check | `uv run --project apps/api mypy apps/api/src` | M1-T06 |
-| Install frontend dependencies | `pnpm --dir apps/web install --frozen-lockfile` | M1-T07 |
-| Start the web app | `pnpm --dir apps/web dev --port 3000` | M1-T07 |
-| Run frontend tests | `pnpm --dir apps/web test` | M1-T07 |
-| Frontend lint | `pnpm --dir apps/web lint` | M1-T07 |
-| Frontend type check | `pnpm --dir apps/web typecheck` | M1-T07 |
+| Install frontend dependencies | `(cd apps/web && pnpm install --frozen-lockfile)` | M1-T07 |
+| Start the web app | `(cd apps/web && pnpm dev --port 3000)` | M1-T07 |
+| Run frontend tests | `(cd apps/web && pnpm test)` | M1-T07 |
+| Frontend lint | `(cd apps/web && pnpm lint)` | M1-T07 |
+| Frontend type check | `(cd apps/web && pnpm typecheck)` | M1-T07 |
 | Apply database migrations | `uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head` | M1-T09 |
-| Run end-to-end verification | `pnpm --dir apps/web exec playwright test ../../tests/e2e` | M5 |
+| Run end-to-end verification | `(cd apps/web && pnpm exec playwright test ../../tests/e2e)` | M5 |
 
 The implementing ticket may correct a command only when its selected tool cannot support the
 documented form. It must update this file and `AGENTS.md` in the same change so there is one
 authoritative workflow.
 
-## Contributor procedure
+## M1 integrated verification baseline
 
-After the owning scaffold tickets exist:
+Run this ordered procedure from a clean checkout. It is the authoritative M1 verification
+procedure; it uses no provider credential and does not run live spikes.
 
-1. Install CPython 3.12 and Node.js 22, then enable Corepack and install `uv`.
-2. Run the backend and frontend dependency-install commands above.
-3. Copy each committed `.env.example` to its ignored local counterpart and fill only required
-   backend secrets. Keep runtime files under `var/`.
-4. Start FastAPI on port 8000 in one terminal with exactly one worker.
-5. Start Next.js on port 3000 in a second terminal and open `http://127.0.0.1:3000`.
-6. Run the relevant test, lint, and type-check commands from the command table. Apply migrations
-   before persistence-dependent work once M1-T09 is complete.
+0. Bootstrap the toolchain. Install CPython 3.12 and Node.js 22 using the versions selected by
+   `.python-version` and `.nvmrc`. Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
+   with its official instructions, then enable Corepack. From the repository root, Corepack reads
+   `apps/web/package.json` and installs its pinned `pnpm` 10 release:
 
-M1-T12 will exercise this procedure from a clean local state and may add a single integrated
-verification command without changing the two-process, same-origin, single-writer constraints.
+   ```sh
+   corepack enable
+   (cd apps/web && corepack install)
+   uv --version
+   (cd apps/web && pnpm --version)
+   ```
+
+1. Install locked dependencies:
+
+   ```sh
+   uv sync --project apps/api --all-groups
+   (cd apps/web && pnpm install --frozen-lockfile)
+   ```
+
+2. Create `apps/api/.env` only if it does not already exist. This command never overwrites an
+   existing local environment file. Keep `OPENROUTER_API_KEY` empty for this baseline:
+
+   ```sh
+   if [ ! -e apps/api/.env ]; then
+     cp apps/api/.env.example apps/api/.env
+   fi
+   ```
+
+3. Create and migrate a unique ignored verification database. Keep this shell open for the API
+   process in step 5 so it uses the same database. The run ID makes each invocation a fresh
+   migration without deleting an existing verification database:
+
+   ```sh
+   mkdir -p var/m1-verification
+   MARGIN_VERIFICATION_RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+   export MARGIN_DATABASE_URL="sqlite:///var/m1-verification/${MARGIN_VERIFICATION_RUN_ID}.db"
+   uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
+   ```
+
+4. Run all automated checks:
+
+   ```sh
+   uv run --project apps/api pytest apps/api/tests
+   uv run --project apps/api ruff check apps/api
+   uv run --project apps/api mypy apps/api/src
+   (cd apps/web && pnpm test)
+   (cd apps/web && pnpm lint)
+   (cd apps/web && pnpm typecheck)
+   ```
+
+5. In the same shell that performed the migration, start exactly one API worker against that
+   migrated verification database. In a separate terminal, start the web application:
+
+   ```sh
+   uv run --project apps/api uvicorn margin_api.main:app --reload --port 8000
+   (cd apps/web && pnpm dev --port 3000)
+   ```
+
+6. Open `http://127.0.0.1:3000/api-health`, confirm that it says “The local API is connected,” and
+   inspect the browser console for errors. The same-origin route must also return the API health
+   response:
+
+   ```sh
+   curl --fail http://127.0.0.1:3000/api/health
+   ```
+
+The procedure exercises the Next.js rewrite, API health endpoint, fresh Alembic migration, domain
+schema persistence tests, and deterministic fake capability tests together. It deliberately does
+not treat a live OpenRouter call as a normal automated check.
+
+## M1 accepted configuration and constraints
+
+`apps/api/.env.example` is the authoritative non-secret configuration. The values below were
+measured by the M1 spike reports and are repeated here to make the implementation constraints easy
+to find:
+
+| Area | Initial configuration | Accepted constraint |
+| --- | --- | --- |
+| PDF extraction | `pypdf` 6.1.1 with `pdfplumber` 0.11.7 | The selected checksum-pinned Constitution PDF is text-based and needs no OCR. Its unusable outline and one signature-page multi-column exception require deterministic layout/fallback processing; arbitrary-PDF support is unproven. |
+| Recording and STT | Chromium WebM/Opus, `openai/gpt-4o-transcribe`, 120 seconds, 2,000 normalized-question characters | The verified Chromium path needs no audio conversion. Longer recordings and other browser formats require later validation. |
+| Reasoning | `openai/gpt-5.6-sol`, 128,000-token profile, 4,096 reserved answer tokens, 2,048-token safety margin, `o200k_base` plus 4 framing tokens | Enforce either the selected token estimator or the 3.0-characters-per-token fallback, never whichever makes a request fit. Reject over-limit questions or session dialogue; never truncate or summarize source or dialogue. |
+| TTS | `microsoft/mai-voice-2`, `en-US-Harper:MAI-Voice-2`, MP3, speed 1.0 | Generate paragraph or stored-answer audio only. Validate non-empty `audio/mpeg` bytes; one bounded retry is reserved for documented transient provider failures. |
+| Audio cache | Contract version, model, voice, MP3 format, speed, and optional style/style degree form the cache version | Changing any byte-affecting synthesis input must select a new cache namespace. Browser playback speed is not a synthesis-cache input. |
+
+The PDF, STT, TTS, and reasoning reports under `docs/spikes/` retain their reproducible commands,
+measurements, live-run evidence, and unresolved risks. Provider routing, price, latency, tokenizer
+compatibility, and model availability can drift, so provider checks stay explicit and opt-in.
