@@ -79,36 +79,64 @@ M0-T08 adds deterministic start and flat section navigation; richer navigation r
   requirements are documented from measured capability behavior rather than page-count guesses.
 - Automated checks run through a documented verification command or procedure.
 
-### M2 — PDF reader and narration
+### M2 — Simple end-to-end conversational-reading prototype
 
 **Status:** Ready to begin with `M2-T01`; later tickets remain dependency-gated in `TASKS.md`.
 
-**Outcome:** A user can upload the selected supported PDF, choose where to begin, listen paragraph by paragraph, pause, navigate by section or backward, and resume from a persisted anchor.
+**Outcome:** A user can upload the selected supported PDF, listen linearly from the beginning,
+pause at a paragraph, ask spoken questions and follow-ups, hear spoken answers, continue reading,
+and later begin a new anchored conversation that retains every earlier discussion from the active
+reading session.
 
 **Exit criteria:**
 
-- Upload and processing states are visible.
-- Extracted sections and paragraphs remain ordered and lossless.
+- Upload and processing states are visible, and unsupported or non-extractable PDFs fail clearly.
+- Deterministic processing persists a bounded document map plus ordered sections and paragraphs
+  without omitting, duplicating, overlapping, or reordering retained source text.
+- Narration begins at the first paragraph, displays the active paragraph, generates versioned
+  disposable audio on demand, and advances in canonical paragraph order.
+- Play and Pause work without previous-paragraph, speed, section-navigation, reload-resume, or
+  prefetch controls.
+- Pressing Ask records and transcribes a bounded spoken question and creates or reuses a
+  conversational episode anchored to the paused paragraph.
+- M2's deliberately provisional local-only package contains document identification, up to two
+  preceding whole paragraphs, the unchanged anchor, one following whole paragraph, every complete
+  earlier interaction from the active reading session, and the current question. M3 completes the
+  RFC's richer local, section, and document-wide context contract.
+- The provisional context builder is deterministic, keeps dialogue in chronological order, treats
+  source text as authoritative, and never treats earlier answers as source evidence.
+- M2 answers from only that provisional local package. A question requiring unsupplied section or
+  document evidence receives an honest limitation rather than an implied section-wide or
+  document-wide analysis.
+- Same-episode follow-ups retain the original anchor. Continue ends the episode without ending the
+  reading session and resumes narration from the beginning of the anchored paragraph.
+- After narration advances, a later Ask creates a new episode at the new paragraph and receives
+  every complete earlier interaction from the active reading session.
+- A complete prompt that exceeds the configured limit fails clearly and never silently truncates
+  or summarizes source text, the question, or an active-session turn.
+- One fake-provider browser test and one explicit opt-in live-provider run demonstrate the complete
+  M2 loop on the selected benchmark PDF.
+
+### M3 — Reader and context expansion
+
+**Status:** Not started; revisit and decompose after M2 using implementation evidence.
+
+**Outcome:** The M2 prototype expands into the complete V0 reader and context contract, including
+deterministic start and navigation choices, persisted resume, and grounded local, section, and
+document-wide question scopes.
+
+**Exit criteria:**
+
 - Before narration, the user can resume the saved paragraph, start at the beginning, or select any
   ordered detected or fallback section.
 - Every selectable section exposes a stable ID, title, order, and first paragraph ID; invalid or
   cross-document selections fail clearly.
-- The active paragraph is displayed and highlighted.
-- Paragraph audio is generated on demand and the next paragraph is prefetched.
-- Pause, previous paragraph, playback speed, section navigation, and resume work.
-- Selecting a new section pauses narration and persists that section's first paragraph as the new
-  reading position without creating a second source order or navigation model.
-- Reading position survives a page reload.
-
-### M3 — Grounded question and answer
-
-**Status:** Not started; decompose near M2 completion.
-
-**Outcome:** A user can pause narration, ask one spoken question at local, section, or document-wide scope, see and hear a grounded answer, and continue reading.
-
-**Exit criteria:**
-
-- Browser audio is recorded and transcribed.
+- Previous paragraph, playback speed, section navigation, page-reload resume, and next-paragraph
+  prefetch are available.
+- Selecting the beginning or a section pauses narration and persists the resolved paragraph without
+  creating a second source order or navigation model.
+- Navigation retains the active reading session and all its dialogue, but cannot mutate an active
+  episode's immutable anchor; the episode must end before position changes.
 - Scope selection is explicit, deterministic, and testable without a classifier or retrieval call.
 - Local questions receive document orientation, current-section synopsis, the canonical local
   passage window, complete earlier active-session dialogue, and the current question.
@@ -123,34 +151,16 @@ M0-T08 adds deterministic start and flat section navigation; richer navigation r
   and general knowledge do not become unsupported source evidence.
 - The textual interaction is stored exactly once.
 - Answer audio is generated separately and can be retried.
-- Continue resumes from the recorded paragraph.
+- All deferred reader and context behavior is reconsidered against evidence from M2 before M3 is
+  decomposed; these outcome-level criteria preserve the intended ideas without precommitting to
+  speculative ticket boundaries.
 
-### M4 — Session-continuous conversational reading
+### M4 — V0 hardening and dogfooding
 
-**Status:** Not started; decompose near M3 completion.
+**Status:** Not started; revisit and decompose after M3 using implementation evidence.
 
-**Outcome:** The user can converse while paused, continue reading, and later begin a new anchored conversation that remembers every earlier discussion from the same reading session.
-
-**Exit criteria:**
-
-- Follow-ups remain associated with one conversational episode.
-- A reading session contains multiple ordered conversational episodes.
-- The context builder includes every complete earlier turn from the active reading session.
-- A context-limit failure is explicit and never silently drops or summarizes an earlier session turn.
-- The user can ask, hear an answer, ask again, and then continue.
-- Continuing closes the active conversational episode without ending the reading session.
-- After Continue, backward movement, or section navigation, the next Ask creates a new episode with
-  the newly selected immutable paragraph anchor while retaining every earlier interaction from the
-  active reading session.
-- Navigation cannot mutate the anchor of an active conversational episode; that episode must end
-  before the reading position changes.
-- The benchmark same-episode and cross-episode questions produce coherent, grounded responses.
-
-### M5 — V0 hardening and dogfooding
-
-**Status:** Not started; decompose near M4 completion.
-
-**Outcome:** The complete V0 loop is reliable enough for repeated use on a real difficult document and produces evidence for V1 prioritization.
+**Outcome:** The complete V0 loop is reliable enough for repeated use on a real difficult document
+and produces evidence for V1 prioritization.
 
 **Exit criteria:**
 
@@ -176,4 +186,6 @@ decision promotes them into this roadmap and creates actionable work in `TASKS.m
 
 ## Planning horizon
 
-M0 through M2 are decomposed into implementation-ready tickets in `TASKS.md`. M3 through M5 remain outcome-level plans until discoveries from the preceding milestone make responsible decomposition possible.
+M2 is decomposed from the completed M1 integration evidence in `TASKS.md`. M3 and M4 intentionally
+retain the deferred V0 ideas at outcome level until evidence from the preceding milestone makes
+responsible decomposition possible.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Margin Deliver Ticket"
+  short_description: "Deliver one Margin ticket end to end"
+  default_prompt: "Use $margin-deliver-ticket M1-T08 to implement, independently review, fix, verify, commit, and push the ticket."

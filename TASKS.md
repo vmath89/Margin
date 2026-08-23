@@ -481,8 +481,10 @@ Recommended execution order with a work-in-progress limit of one:
 5. Add the approved persisted domain schema in M1-T10.
 6. Run M1-T12 as the milestone integration gate and decompose M2 from the evidence collected.
 
-M1 validates external capabilities but does not add real provider calls to the product or implement
-upload, reader, navigation UI, narration, or Ask behavior.
+M1 validates external capabilities and establishes the application foundation but does not add
+real provider calls or implement the user-facing reading flow. M2 owns the deliberately narrow
+end-to-end conversational-reading slice; M3 revisits and completes the deferred V0 reader and
+context behavior.
 
 ## M1-T01 — Define the repository layout and local developer workflow
 
@@ -962,15 +964,17 @@ The application foundation has a documented, repeatable verification procedure a
   environment configuration without committing secrets.
 - Update `AGENTS.md` with the final commands and conventions.
 - Reconcile M1 completion against every exit criterion in `ROADMAP.md`.
-- Decompose M2 into implementation-ready tickets using the completed M1 evidence, and move only the
-  first dependency-satisfied M2 ticket to `Ready`.
+- Document the deliberately narrow M2 prototype boundary, decompose it into the six ordered tickets
+  below using the completed M1 evidence, and move only M2-T01 to `Ready`.
+- Preserve the deferred reader, navigation, context-expansion, hardening, and dogfooding ideas as
+  outcome-level M3 and M4 plans rather than decomposing them speculatively.
 
 ### Out of scope
 
 - PDF upload or reader features.
 - Real model integrations beyond completed spikes.
 - Deployment automation.
-- Implementing any M2 upload, reader, navigation, or narration behavior.
+- Implementing any M2 upload, narration, conversation, or browser behavior.
 
 ### Acceptance criteria
 
@@ -983,8 +987,10 @@ The application foundation has a documented, repeatable verification procedure a
 - Authoritative configuration documents the initial recording, context-budget, answer-reserve,
   safety-margin, model/voice, and audio-cache inputs established by the spikes.
 - M1 exit criteria in `ROADMAP.md` are satisfied.
-- M2 has an ordered, dependency-aware backlog based on evidence rather than speculative
-  implementation detail.
+- M2 has six ordered, dependency-aware tickets based on evidence rather than speculative
+  implementation detail; only M2-T01 is `Ready`.
+- M3 and M4 retain the deferred V0 ideas at outcome level for evidence-based review after the
+  preceding milestone.
 
 ### Verification
 
@@ -994,11 +1000,22 @@ The application foundation has a documented, repeatable verification procedure a
 
 ---
 
-# M2 — PDF reader and narration
+# M2 — Simple end-to-end conversational-reading prototype
 
-M2 is decomposed from the completed M1 extraction, recording, TTS, persistence, and same-origin
-evidence. The scope remains limited to the selected supported text-based PDF and fake capability
-operations in normal automated tests. M3 owns spoken questions and reasoning context.
+M2 is the narrowest useful vertical slice of Margin's defining interaction. It uses the completed
+M1 extraction, recording, reasoning, TTS, persistence, and same-origin evidence to let one user
+upload the selected supported PDF, listen linearly from the beginning, pause, hold a grounded
+spoken conversation, continue, and later ask a new question that retains every earlier discussion
+from the active reading session.
+
+M2 still creates the architecture's lossless ordered sections and bounded document map because the
+persisted schema and source-order invariants require them. It deliberately does not expose section
+navigation or implement the RFC's complete local, section, and document-wide context packages.
+Its local-only prompt is a provisional prototype package for validating the end-to-end interaction;
+M3 revisits and completes the deferred reader and context contract using evidence from M2.
+
+Normal automated tests replace only the three OpenRouter operations with deterministic fakes. Live
+provider verification remains explicit and opt-in.
 
 ## M2-T01 — Build the deterministic selected-PDF processing pipeline
 
@@ -1038,141 +1055,277 @@ sections and paragraphs suitable for persistence and reader navigation.
 - Run focused deterministic parsing and normalization tests.
 - Re-run the M1-T02 spike self-test against the selected pinned PDF when its fixture is available.
 
-## M2-T02 — Persist uploaded-document preparation and state
+## M2-T02 — Upload and persist one supported PDF
 
 **Status:** Backlog
 **Depends on:** M2-T01
 
 ### Outcome
 
-A user can submit the supported PDF and observe a persisted document preparation result backed by
-the ordered output from M2-T01.
+A user can upload the supported PDF in the browser, see its preparation result, and receive one
+atomically persisted document backed by the ordered output from M2-T01.
 
 ### Scope
 
 - Add the narrow same-origin upload and processing API needed for one supported PDF.
 - Persist source ownership, document status, document map, sections, paragraphs, and initial
   reading position using the existing schema.
+- Add a minimal upload screen with visible submitting, processing, ready, and failed states.
 - Return explicit validation and processing failures without exposing local paths or credentials.
-- Add deterministic API and temporary-database coverage.
+- Publish all derived sections and paragraphs together only after processing succeeds; retry cannot
+  expose partial authoritative data or duplicate derived rows.
+- Add deterministic API, browser-component, and temporary-database coverage.
 
 ### Out of scope
 
-- OCR, broad PDF compatibility, background queues, model calls, reader controls, and narration.
+- OCR, broad PDF compatibility, a document library, background queues, model calls, reader
+  controls, section navigation, and narration.
 
 ### Acceptance criteria
 
-- A supported upload enters visible preparation states and produces the persisted ordered hierarchy.
+- A supported upload enters visible preparation states and produces the persisted ordered hierarchy
+  and bounded document map from M2-T01.
 - Invalid, image-only, and unsupported inputs fail clearly without partial authoritative data.
 - The persisted first paragraph becomes the document's initial reading position.
+- Browser requests use only same-origin `/api` routes and expose no provider credentials or local
+  source paths.
 
 ### Verification
 
 - Run API upload/processing tests with temporary databases and the selected fixture.
+- Run focused upload-screen tests for success and failure states.
 - Verify migration-backed persistence against a fresh database.
 
-## M2-T03 — Expose deterministic reader start and navigation state
+## M2-T03 — Deliver linear listening from the document beginning
 
 **Status:** Backlog
 **Depends on:** M2-T02
 
 ### Outcome
 
-The API exposes the reader's persisted position and the RFC's three deterministic pre-narration
-starts: resume, beginning, and an ordered section.
+A user can start at the first paragraph, listen in canonical paragraph order, see the active
+paragraph, and explicitly play or pause narration.
 
 ### Scope
 
-- Add explicit API operations to read reader state and select resume, beginning, or a section's
-  first paragraph.
-- Validate document membership and invalid/missing section or paragraph choices.
-- Preserve source order and persist only the resolved paragraph position.
-- Add state-transition tests for valid and invalid selections.
+- Create or resume the document's active reading session when the user starts reading, using the
+  first paragraph as M2's only start choice.
+- Add the reader API needed to load the active paragraph and its next ordered paragraph and to save
+  canonical paragraph transitions.
+- Generate or reuse disposable paragraph MP3 audio on demand through the application-owned speech
+  operation and the M1 versioned cache-addressing contract; validate bytes before publishing them.
+- Build the minimal listening screen with the active paragraph, Play, and Pause. Reserve
+  **Continue Reading** for ending a conversational episode in M2-T04 and M2-T05.
+- Advance automatically after successful paragraph playback and stop clearly at the document end.
+- Treat a paragraph as the synchronization unit. Pausing midway leaves that paragraph current;
+  resuming after an ordinary Pause may continue browser playback, while Continue after a
+  conversation restarts the anchored paragraph from its beginning.
+- Add focused service, API, playback-state, and cache-path tests using fake speech.
 
 ### Out of scope
 
-- Conversational episodes, question handling, browser playback, backward playback control, and
-  generated audio.
+- Real provider integration, Ask, recording, answer audio, previous paragraph, playback speed,
+  section navigation, reload resume, progress UI, next-paragraph prefetch, and cache optimization.
 
 ### Acceptance criteria
 
-- Every returned section includes its stable ID, title, source order, and first paragraph ID.
-- Resume, beginning, and section selection resolve deterministically and persist the selected
-  paragraph.
-- Cross-document, missing, and malformed selections fail clearly.
+- Narration starts at the document's first paragraph and advances without skipping, duplicating, or
+  reordering paragraphs.
+- The listening screen displays and highlights the paragraph whose audio is current.
+- Play and Pause do not create or end a conversational episode.
+- Failed audio generation leaves the current paragraph unchanged and exposes a stable error.
+- Cache keys change whenever a byte-affecting TTS configuration input changes; prefetch and broader
+  cache policy remain deferred.
 
 ### Verification
 
-- Run focused API state-transition tests against an isolated migrated database.
+- Run narration service and API tests with deterministic fake speech, an isolated database, and
+  isolated local cache paths.
+- Run focused browser tests for start, Play, Pause, automatic advance, failure, and document end.
 
-## M2-T04 — Add on-demand paragraph narration and reader controls
+## M2-T04 — Persist a session-continuous grounded conversation
 
 **Status:** Backlog
 **Depends on:** M2-T03
 
 ### Outcome
 
-The reader API can obtain disposable paragraph audio, prefetch the next paragraph, and preserve its
-position through narration controls using the fake speech operation in automated tests.
+The backend can turn a bounded recorded question into one grounded stored answer, support
+same-episode follow-ups, and carry every complete earlier interaction into a later episode in the
+same reading session.
 
 ### Scope
 
-- Add the minimal narration service and API contracts for current/next paragraph audio and
-  persisted reading position updates.
-- Use the M1 audio-cache version inputs for disposable cache addressing and validate generated
-  audio before publishing it.
-- Define explicit retryable/non-retryable narration errors without moving position on failure.
-- Add focused fake-capability and persistence tests.
+- Add the interaction operation that accepts a bounded browser-compatible recording for the active
+  reading session and validates that its paragraph belongs to the document.
+- Transcribe through the application-owned operation. The normalized transcript must fit the M1
+  question limit or fail clearly without silent truncation.
+- On the first successful Ask at a paused position, create an active conversational episode with an
+  immutable paragraph anchor. Reuse that episode and its original anchor for follow-ups.
+- Build M2's provisional local-only prompt from document title, author, and type when available; up
+  to two preceding whole paragraphs; the unchanged anchored paragraph; one following whole
+  paragraph; every complete earlier interaction from the active reading session in chronological
+  order; and the complete current question.
+- Include source markers and explicit instructions that uploaded source text is authoritative,
+  earlier dialogue is conversational memory rather than source evidence, and general knowledge or
+  model-created examples must be identified as background or illustration.
+- Instruct the model to disclose that it received only provisional local context when a question
+  requires unsupplied section or document evidence. It must not imply section-wide or
+  document-wide analysis or identify other source locations as verified.
+- Measure the exact assembled prompt, including instructions, labels, source, complete dialogue,
+  question, answer reserve, and safety margin. Reject an over-limit request and require a new
+  reading session; never truncate or summarize source, dialogue, or the question to make it fit.
+- Generate the textual answer through the application-owned operation and persist one complete
+  Interaction only after transcription and answer generation succeed. Do not hold a database
+  transaction open during transcription, reasoning, or speech synthesis.
+- Add separate on-demand answer-audio and Continue operations. Continue ends only the matching
+  episode, preserves the reading session and all its interactions, restores the episode anchor as
+  current, and returns that paragraph for narration from its beginning.
+- A later Ask after narration advances creates a new anchored episode and includes every complete
+  interaction from ended and active episodes in that reading session. Dialogue from an ended or
+  different reading session is excluded.
+- Add deterministic prompt, context-budget, state-transition, persistence, failure, and ordering
+  tests using fake capabilities.
 
 ### Out of scope
 
-- Real provider integration, answer audio, spoken questions, and browser UI.
+- The final recording and conversation UI, real provider integration, section synopses, complete
+  current-section context, full-document context, limited document-wide context, retrieval,
+  conversation summarization, and cross-session recall.
 
 ### Acceptance criteria
 
-- Current paragraph audio is generated or reused deterministically and the next paragraph can be
-  prefetched.
-- Failed generation leaves the persisted reading position unchanged and exposes a clear error.
-- Cache keys change when byte-affecting TTS configuration changes.
+- Same-episode follow-ups retain one immutable anchor and receive every earlier complete turn from
+  the active reading session exactly once in chronological order.
+- Continue ends the episode without ending the reading session or deleting its dialogue.
+- A later episode uses its new paragraph anchor while receiving all complete earlier session
+  interactions; ended-session dialogue is never included.
+- Prompt-limit failure is explicit and cannot silently omit, truncate, sample, or summarize a
+  source paragraph, interaction, or question.
+- Failed transcription or reasoning creates no incomplete Interaction, and retry cannot duplicate
+  a completed Interaction.
+- New claims about the PDF are grounded in the source text supplied for the current request, not in
+  an earlier generated answer.
+- A question that cannot be supported by the provisional local package receives an honest context
+  limitation instead of an unsupported broader-document answer.
 
 ### Verification
 
-- Run narration service tests with deterministic fake speech and isolated local cache paths.
+- Run pure prompt/context-budget tests, session and episode state-transition tests, and interaction
+  API tests against an isolated migrated database with fake transcription, reasoning, and speech.
 
-## M2-T05 — Deliver the browser PDF-reader and narration slice
+## M2-T05 — Connect the spoken question-and-answer interface
 
 **Status:** Backlog
-**Depends on:** M2-T03, M2-T04
+**Depends on:** M2-T04
 
 ### Outcome
 
-A user can upload the supported PDF, choose a start, listen paragraph by paragraph, use reader
-controls, navigate by section, and return after a page reload to the persisted anchor.
+A user can pause narration, record a spoken question, see and hear the answer, ask spoken
+follow-ups, continue reading, and later start a new conversation that naturally uses the earlier
+discussion from the active reading session.
 
 ### Scope
 
-- Build the minimal same-origin browser UI for upload/processing state, ordered sections, active
-  paragraph, narration, pause, previous paragraph, playback speed, section navigation, and resume.
-- Ensure section selection pauses playback and persists the selected section's first paragraph.
-- Add high-value browser and cross-boundary tests using fake operations.
+- Add the production OpenRouter HTTP module implementing only the existing generate-text,
+  transcription, and speech-synthesis operations, with backend-only credentials, configured model
+  IDs, explicit timeouts, stable error mapping, and one bounded retry for documented transient
+  failures.
+- When narration is paused, expose Ask. Record at most the configured duration as the M1-verified
+  WebM/Opus format, show explicit recording and submission states, and send it through same-origin
+  `/api` routes.
+- Display the normalized user transcript and textual answer so transcription and grounding remain
+  inspectable, then request and play answer audio separately.
+- While an episode is active, expose Ask again and Continue Reading. Ask again records a follow-up;
+  Continue ends the episode and restarts narration from the anchored paragraph.
+- After narration reaches a later paragraph, the next Ask must create a visibly new anchored
+  episode while the answer can naturally use the earlier session dialogue.
+- Keep the reader paused throughout an active episode and prevent playback state from silently
+  changing the episode anchor.
+- Add focused provider-boundary tests with mocked HTTP plus browser-component and cross-boundary
+  tests using fake application capabilities.
 
 ### Out of scope
 
-- Ask, transcription, reasoning, answers, conversational episodes, and live providers.
+- Typed chat, streaming, WebSockets, wake words, voice activity detection, answer interruption,
+  polished retry workflows, section navigation, previous paragraph, playback speed, reload resume,
+  and broader context scopes.
 
 ### Acceptance criteria
 
-- The complete M2 outcome and every M2 exit criterion in `ROADMAP.md` are demonstrable on the
-  selected supported PDF.
-- Browser requests use only same-origin `/api` routes and expose no provider credentials.
-- A reload resumes the persisted reading position.
+- The visible flow is Play or Pause during narration, Ask while paused, and Ask again or Continue
+  Reading during an active conversation.
+- The transcript and answer appear on screen, and paragraph and answer audio are playable.
+- A follow-up remains anchored to the original paragraph; Continue resumes from the beginning of
+  that paragraph without ending the reading session.
+- A later Ask at a new paragraph demonstrates carried dialogue from the earlier ended episode.
+- Browser requests use only same-origin `/api` routes, and provider credentials or backend-only
+  configuration never enter frontend variables or responses.
 
 ### Verification
 
-- Run backend, frontend, lint, and type checks.
-- Exercise the reader in a real browser and inspect runtime and console errors.
+- Run provider-boundary tests without network access and the relevant backend and frontend tests.
+- Exercise recording, transcript display, answer playback, follow-up, Continue, and later Ask in a
+  real browser with fake capabilities and inspect runtime and console errors.
+
+## M2-T06 — Verify the first end-to-end prototype
+
+**Status:** Backlog
+**Depends on:** M2-T05
+
+### Outcome
+
+The complete M2 interaction is reproducible through one deterministic browser test and has one
+recorded opt-in live-provider evaluation on the selected benchmark PDF.
+
+### Scope
+
+- Add the Playwright setup required by the canonical repository command and run the real Next.js
+  and FastAPI applications against a migrated temporary database and isolated local data paths.
+- Replace only the three OpenRouter operations with deterministic fakes in the automated flow.
+- Cover upload, preparation, start from the beginning, narration, Pause, one recorded question,
+  answer display and playback, a same-episode follow-up, Continue, advancement to a later paragraph,
+  a new question that uses the earlier discussion, and Continue from the new episode's anchor.
+- Use committed prerecorded legal audio fixtures for deterministic Playwright submission; test the
+  MediaRecorder interaction separately at the browser-component boundary.
+- Run one explicit opt-in live-provider browser session on the checksum-pinned benchmark PDF using
+  actual microphone recording and the B1/S1-to-S3 continuity path or an equivalent sequence that
+  exercises both same-episode follow-up and cross-episode memory.
+- Record basic transcription, narration, answer, and total interaction latency; provider failures;
+  grounding quality; and interaction friction. Do not turn this ticket into broad hardening or
+  benchmark evaluation.
+- Reconcile the integrated result against every M2 exit criterion in `ROADMAP.md` and record
+  discoveries for the post-M2 M3 review without decomposing M3 in this ticket.
+
+### Out of scope
+
+- Full B1-B7/S1-S3 evaluation, broad retry hardening, multiple real reading sessions, polished UX,
+  M3 decomposition, navigation and resume controls, section/document-wide context, and V1
+  prioritization.
+
+### Acceptance criteria
+
+- The fake-provider Playwright test crosses the real browser/API boundary and passes without
+  network access or provider credentials.
+- The automated flow proves same-episode follow-up, Continue semantics, a new later paragraph
+  anchor, complete earlier active-session dialogue, and resume from the new episode's anchor.
+- The opt-in live run successfully exercises real browser recording plus production STT, reasoning,
+  paragraph TTS, and answer TTS, or records a concrete provider failure without weakening the
+  deterministic completion gate.
+- Basic live observations and post-M2 discoveries are recorded without committing recordings,
+  private source material, generated audio, credentials, or full sensitive prompts.
+- Every M2 exit criterion in `ROADMAP.md` is demonstrable before M2 is marked complete.
+
+### Verification
+
+- Run the canonical backend tests, backend lint, backend type checking, frontend tests, frontend
+  lint, frontend type checking, migrations, and Playwright command.
+- Run the live-provider browser sequence explicitly and opt-in, then inspect browser and API logs
+  for errors and sensitive-content leakage.
 
 # Later milestones
 
-M3 through M5 remain outcome-level plans in `ROADMAP.md`. Decompose each near the end of its
-preceding milestone, using evidence from the completed implementation rather than speculative work.
+M3 and M4 retain the deferred reader, navigation, context-expansion, hardening, benchmark, and
+dogfooding ideas at outcome level in `ROADMAP.md`. Revisit and decompose M3 only after M2 is
+complete, then revisit and decompose M4 only after M3 is complete, using evidence from the
+implemented product rather than speculative ticket boundaries.
