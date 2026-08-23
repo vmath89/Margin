@@ -5,6 +5,9 @@ from __future__ import annotations
 from logging.config import fileConfig
 
 from alembic import context
+from margin_api import (
+    models,  # noqa: F401  # Import models to register metadata for autogeneration.
+)
 from margin_api.config import Settings
 from margin_api.database import Base, create_database_engine
 
