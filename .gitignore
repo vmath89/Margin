@@ -15,10 +15,12 @@
 
 # Node.js and Next.js output.
 **/node_modules/
+**/.pnpm-store/
 **/.next/
 **/coverage/
 **/playwright-report/
 **/test-results/
+**/*.tsbuildinfo
 
 # Margin runtime data. The directory name is reserved by DEVELOPMENT.md.
 /var/

@@ -755,7 +755,7 @@ A minimal FastAPI application starts locally, loads validated configuration, and
 
 ## M1-T07 — Scaffold the Next.js application
 
-**Status:** Ready
+**Status:** Done
 **Depends on:** M1-T01
 
 ### Outcome
