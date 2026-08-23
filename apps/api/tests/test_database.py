@@ -44,7 +44,7 @@ def test_migrations_apply_to_a_fresh_temporary_database(
     engine = create_engine(f"sqlite:///{database_path}")
     with engine.connect() as connection:
         revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        assert revision == "20260823_01"
+        assert revision == "20260823_02"
 
     assert not environment_database_path.exists()
 
@@ -61,4 +61,4 @@ def test_migrations_use_the_api_database_setting_without_an_alembic_override(
     engine = create_engine(f"sqlite:///{database_path}")
     with engine.connect() as connection:
         revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        assert revision == "20260823_01"
+        assert revision == "20260823_02"
