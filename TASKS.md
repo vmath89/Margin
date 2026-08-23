@@ -1017,6 +1017,14 @@ M3 revisits and completes the deferred reader and context contract using evidenc
 Normal automated tests replace only the three OpenRouter operations with deterministic fakes. Live
 provider verification remains explicit and opt-in.
 
+## M2 human review rhythm
+
+Every M2 completion handoff must include the ticket's human checkpoint below in plain language,
+alongside the normal acceptance criteria and verification results. The checkpoint keeps the human
+reviewer oriented: what now works, what can be inspected directly, what evidence should be shown,
+what feedback is needed, and what is intentionally still unavailable. A checkpoint does not replace
+automated verification or silently add scope to the ticket.
+
 ## M2-T01 — Build the deterministic selected-PDF processing pipeline
 
 **Status:** Done
@@ -1113,6 +1121,23 @@ atomically persisted document backed by the ordered output from M2-T01.
 - Run focused upload-screen tests for success and failure states.
 - Verify migration-backed persistence against a fresh database.
 
+### Human checkpoint
+
+- **Project state:** The selected PDF can enter the product and become a saved, prepared document;
+  it still cannot be read aloud or discussed.
+- **What was accomplished:** A browser upload now reaches FastAPI, shows preparation progress, and
+  either publishes one complete readable document or shows a clear failure.
+- **What to inspect:** Upload the supported PDF and watch the submitting, processing, and ready
+  states. Then try one unsupported or non-extractable PDF and confirm the failure is understandable
+  and does not expose a local path or secret.
+- **Evidence to request:** A successful browser walkthrough, a failed-upload walkthrough, API and
+  temporary-database test results, and proof that failed processing leaves no partial sections or
+  paragraphs.
+- **Feedback needed:** Confirm that the processing language makes sense to a normal user. Flag any
+  state that feels stuck, misleading, or too technical; no reader-design decision is required yet.
+- **Not available yet:** Play, Pause, narration, Ask, follow-ups, and Continue are not expected to
+  work.
+
 ## M2-T03 — Deliver linear listening from the document beginning
 
 **Status:** Backlog
@@ -1159,6 +1184,23 @@ paragraph, and explicitly play or pause narration.
 - Run narration service and API tests with deterministic fake speech, an isolated database, and
   isolated local cache paths.
 - Run focused browser tests for start, Play, Pause, automatic advance, failure, and document end.
+
+### Human checkpoint
+
+- **Project state:** Margin is now a minimal linear reader: the prepared PDF can be played from the
+  beginning, but it is not yet conversational.
+- **What was accomplished:** The screen shows the active paragraph, Play and Pause control its
+  audio, completed paragraphs advance in order, and playback stops at the document end.
+- **What to inspect:** Start reading, pause partway through a paragraph, play again, watch several
+  paragraph transitions, and reach or simulate the end of the document. Confirm the highlighted
+  paragraph always matches the current audio unit.
+- **Evidence to request:** The browser walkthrough, narration and playback-state test results,
+  canonical transition checks, an audio-generation failure example, and cache-version evidence.
+- **Feedback needed:** Comment on whether the basic Play/Pause behavior and paragraph highlighting
+  are understandable. Do not judge final voice quality yet because normal verification still uses
+  fake speech and production OpenRouter integration arrives in M2-T05.
+- **Not available yet:** Ask, spoken questions, answers, follow-ups, navigation, speed controls, and
+  reload resume remain unavailable.
 
 ## M2-T04 — Persist a session-continuous grounded conversation
 
@@ -1231,6 +1273,25 @@ same reading session.
 - Run pure prompt/context-budget tests, session and episode state-transition tests, and interaction
   API tests against an isolated migrated database with fake transcription, reasoning, and speech.
 
+### Human checkpoint
+
+- **Project state:** The conversation engine and its memory rules exist behind the API, but the
+  final microphone and conversation interface and real providers are not connected yet.
+- **What was accomplished:** Margin can create an anchored discussion, retain follow-ups at that
+  anchor, end it with Continue, and carry all completed discussion into a later anchored episode in
+  the same reading session.
+- **What to inspect:** Review one recorded test trace showing the first question, a follow-up, the
+  episode ending, narration moving to another paragraph, and a later question receiving the earlier
+  dialogue. Inspect the exact provisional local source window supplied for both episodes.
+- **Evidence to request:** Prompt snapshots with source/dialogue labels, chronological interaction
+  ordering tests, context-limit rejection tests, transaction-boundary evidence, and proof that
+  ended-session dialogue is excluded.
+- **Feedback needed:** Confirm that the conversation-memory behavior matches the intended mental
+  model: Continue ends the current pause but does not make the active reading session forget. Flag
+  any answer that appears to treat an earlier AI response as evidence from the PDF.
+- **Not available yet:** This is not a polished browser conversation, and fake answers cannot be
+  used to judge explanation quality, transcription quality, or voice quality.
+
 ## M2-T05 — Connect the spoken question-and-answer interface
 
 **Status:** Backlog
@@ -1284,6 +1345,26 @@ discussion from the active reading session.
 - Run provider-boundary tests without network access and the relevant backend and frontend tests.
 - Exercise recording, transcript display, answer playback, follow-up, Continue, and later Ask in a
   real browser with fake capabilities and inspect runtime and console errors.
+
+### Human checkpoint
+
+- **Project state:** The first genuinely usable conversational-reading loop exists. It has not yet
+  passed the complete M2 integration gate.
+- **What was accomplished:** A user can listen, pause, record a question, inspect the transcript,
+  read and hear an answer, ask a follow-up, continue, and later ask a new question that remembers
+  the earlier discussion.
+- **What to inspect:** Use an actual microphone with the selected PDF. Try the B1 question, its S1
+  follow-up, Continue, and the later S3-style question. Check the recording states, transcript,
+  answer usefulness, spoken answer, and restart from the anchored paragraph.
+- **Evidence to request:** The browser walkthrough with fake capabilities, mocked provider-boundary
+  test results, one explicit live-provider demonstration when credentials are available, and proof
+  that the browser never receives provider credentials.
+- **Feedback needed:** Human product feedback is important here. Record whether asking feels natural,
+  whether transcription is accurate, whether answers are useful and appropriately grounded,
+  whether the voices are acceptable, and whether Ask again versus Continue is clear. Material
+  problems should become explicit follow-up work rather than being hidden in M2-T06.
+- **Not available yet:** Section navigation, previous paragraph, speed controls, reload resume,
+  complete section/document context, polished retries, and production hardening remain deferred.
 
 ## M2-T06 — Verify the first end-to-end prototype
 
@@ -1340,9 +1421,33 @@ recorded opt-in live-provider evaluation on the selected benchmark PDF.
 - Run the live-provider browser sequence explicitly and opt-in, then inspect browser and API logs
   for errors and sensitive-content leakage.
 
+### Human checkpoint
+
+- **Project state:** M2 is complete only if this checkpoint and every roadmap exit criterion are
+  demonstrable. Margin has reached its first end-to-end conversational-reading prototype, not the
+  complete hardened V0.
+- **What was accomplished:** The full upload, listen, pause, spoken Ask, follow-up, Continue, later
+  session-aware Ask, and anchored resume sequence is repeatable across the real browser/API boundary.
+- **What to inspect:** Watch the deterministic end-to-end flow, then perform or review the opt-in
+  live run. Compare the experience with manually switching between a reader and a general-purpose
+  assistant, focusing on continuity rather than visual polish.
+- **Evidence to request:** The complete verification command results, Playwright evidence, the M2
+  roadmap checklist, live-run latency and failure notes, grounding observations, and a concise list
+  of discoveries proposed for the M3 review.
+- **Feedback needed:** Explicit human sign-off is required before treating M2 as complete and
+  decomposing M3. Decide whether the core loop is coherent enough to expand, which observed issues
+  must be fixed first, and which deferred M3 ideas now appear most valuable. Do not select V1 work
+  yet; that remains an M4 evidence decision.
+- **Not available yet:** The richer M3 reader/context contract and M4 reliability, dogfooding, and
+  evidence goals have not been delivered.
+
 # Later milestones
 
 M3 and M4 retain the deferred reader, navigation, context-expansion, hardening, benchmark, and
 dogfooding ideas at outcome level in `ROADMAP.md`. Revisit and decompose M3 only after M2 is
 complete, then revisit and decompose M4 only after M3 is complete, using evidence from the
 implemented product rather than speculative ticket boundaries.
+
+When M3 and M4 are decomposed, every implementation ticket must include a ticket-specific
+`Human checkpoint` with the same six fields used in M2: project state, accomplishment, direct
+inspection, evidence to request, feedback needed, and capabilities not available yet.
