@@ -93,6 +93,15 @@ The browser opens port 3000 and calls `/api`; it does not call port 8000 or Open
 Port 8000 may be used for local health checks. M1-T08 will establish the Next.js rewrite and must
 not add permissive development CORS.
 
+## SQLite operation
+
+The API uses SQLite in WAL mode with foreign-key enforcement enabled for every connection. Run
+exactly one FastAPI worker and do not run background writers in another process. Keep database
+transactions short: application code must finish slow network or provider calls before opening a
+transaction and persist their resulting application-owned values in a separate short transaction.
+The configured database URL defaults to `sqlite:///var/margin.db`; tests instead supply a unique
+temporary SQLite URL.
+
 ## Command contract
 
 The following commands are the canonical interface later tickets must implement. Their owning

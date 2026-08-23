@@ -4,8 +4,10 @@ version = "0.1.0"
 description = "FastAPI backend for the Margin reading companion"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "alembic>=1.16.5,<2",
   "fastapi>=0.116.1,<1",
   "pydantic-settings>=2.10.1,<3",
+  "sqlalchemy>=2.0.43,<3",
   "uvicorn[standard]>=0.35.0,<1",
 ]
 
