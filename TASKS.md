@@ -790,7 +790,7 @@ A minimal Next.js application starts locally and renders a stable V0 shell suita
 
 ## M1-T08 — Establish same-origin web-to-API communication
 
-**Status:** Backlog  
+**Status:** Done
 **Depends on:** M1-T06, M1-T07
 
 ### Outcome
