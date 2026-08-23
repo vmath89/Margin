@@ -907,7 +907,7 @@ The database represents the minimum V0 document, reading-session, conversational
 
 ## M1-T11 — Add deterministic fake capability operations
 
-**Status:** Backlog  
+**Status:** Done
 **Depends on:** M1-T06
 
 ### Outcome
