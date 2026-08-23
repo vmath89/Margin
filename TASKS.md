@@ -824,7 +824,7 @@ The browser can reach FastAPI under `/api` without receiving backend secrets or 
 
 ## M1-T09 — Configure SQLite, SQLAlchemy, and Alembic
 
-**Status:** Backlog  
+**Status:** Done
 **Depends on:** M1-T06
 
 ### Outcome
@@ -860,7 +860,7 @@ The API has a tested local persistence foundation with repeatable schema migrati
 
 ## M1-T10 — Add the initial persisted domain schema
 
-**Status:** Backlog  
+**Status:** Ready
 **Depends on:** M0-T03, M0-T06, M0-T07, M0-T08, M1-T09
 
 ### Outcome
