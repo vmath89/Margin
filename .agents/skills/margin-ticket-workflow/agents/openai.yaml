@@ -1,0 +1,4 @@
+interface:
+  display_name: "Margin Ticket Workflow"
+  short_description: "Implement and review one Margin ticket"
+  default_prompt: "Use $margin-ticket-workflow to implement M1-T01."
