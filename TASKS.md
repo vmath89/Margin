@@ -1019,7 +1019,7 @@ provider verification remains explicit and opt-in.
 
 ## M2-T01 — Build the deterministic selected-PDF processing pipeline
 
-**Status:** Ready
+**Status:** Done
 **Depends on:** M1-T12
 
 ### Outcome
@@ -1055,9 +1055,26 @@ sections and paragraphs suitable for persistence and reader navigation.
 - Run focused deterministic parsing and normalization tests.
 - Re-run the M1-T02 spike self-test against the selected pinned PDF when its fixture is available.
 
+### Human checkpoint
+
+- **Project state:** The application has a trustworthy internal representation of the selected PDF,
+  but there is still no upload screen, reader, audio, or conversation.
+- **What was accomplished:** The pinned Constitution PDF can be converted repeatably into the exact
+  ordered sections and paragraph anchors that every later M2 feature will use.
+- **What to inspect:** Review a small before-and-after sample containing P1-P5 and the page 11
+  signature area. Confirm that the text reads naturally, headings and paragraphs are sensible, and
+  signature columns have not been mixed together.
+- **Evidence to request:** The deterministic test results, the extracted section/paragraph counts,
+  the pinned checksum, the canonical-order assertion, and the representative source-versus-output
+  samples.
+- **Feedback needed:** Raise any passage that looks omitted, reordered, merged incorrectly, or
+  unpleasant to listen to later. No visual-design or product-flow decision is needed yet.
+- **Not available yet:** A human cannot upload or listen to the PDF through the product after this
+  ticket alone.
+
 ## M2-T02 — Upload and persist one supported PDF
 
-**Status:** Backlog
+**Status:** Ready
 **Depends on:** M2-T01
 
 ### Outcome
