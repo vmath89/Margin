@@ -1082,7 +1082,7 @@ sections and paragraphs suitable for persistence and reader navigation.
 
 ## M2-T02 — Upload and persist one supported PDF
 
-**Status:** Ready
+**Status:** Done
 **Depends on:** M2-T01
 
 ### Outcome
