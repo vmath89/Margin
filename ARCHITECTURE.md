@@ -118,6 +118,8 @@ Transcription and the textual answer use one normal request/response operation w
 Responsibilities:
 
 - upload a PDF and poll processing status;
+- inspect the persisted normalized source, document map, and available page markers after
+  preparation succeeds;
 - render the current and neighboring paragraphs;
 - record a bounded `audio/webm` question;
 - manage paragraph and answer audio playback;
@@ -145,6 +147,7 @@ The V0 API surface is:
 |---|---|---|
 | `POST /api/documents` | Upload a PDF and start processing | Document ID and status |
 | `GET /api/documents/{id}` | Poll status or load metadata, position, and selectable sections | Document, status/error, current paragraph ID, ordered `{ id, title, order, first_paragraph_id }` sections |
+| `GET /api/documents/{id}/review?offset=...&limit=...` | Inspect the prepared normalized source before narration exists | Document map plus canonical ordered section and paragraph records with available page markers; pagination metadata |
 | `POST /api/documents/{id}/retry` | Retry a failed processing run | Updated document status |
 | `POST /api/documents/{id}/sessions` | Create or resume the active reading session and select `resume`, `beginning`, or `section_id` | Reading session ID, status, and saved paragraph ID |
 | `POST /api/documents/{id}/sessions/{session_id}/end` | Explicitly end the active reading session | Ended reading session |
