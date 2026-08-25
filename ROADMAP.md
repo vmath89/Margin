@@ -82,18 +82,23 @@ M0-T08 adds deterministic start and flat section navigation; richer navigation r
 
 ### M2 — Simple end-to-end conversational-reading prototype
 
-**Status:** `M2-T02A` is Ready; later reader and conversation tickets remain dependency-gated in
-`TASKS.md`.
+**Status:** `M2-T02A` is In Progress; later reader and conversation tickets remain dependency-gated
+in `TASKS.md`.
 
-**Outcome:** A user can upload a supported text-based PDF, listen linearly from the beginning,
-pause at a paragraph, ask spoken questions and follow-ups, hear spoken answers, continue reading,
-and later begin a new anchored conversation that retains every earlier discussion from the active
-reading session.
+**Outcome:** A user can upload a supported, primarily linear text-based PDF within the configured
+limits, listen linearly from the beginning, pause at a paragraph, ask spoken questions and
+follow-ups, hear spoken answers, continue reading, and later begin a new anchored conversation that
+retains every earlier discussion from the active reading session. M2 proves this interaction as a
+reviewable prototype; it does not claim support for every possible PDF layout or complete the full
+V0 reader and document-context contract.
 
 **Exit criteria:**
 
 - Upload and processing states are visible. Text-based PDFs are not limited to a selected
   benchmark fixture; image-only, encrypted, malformed, or non-extractable PDFs fail clearly.
+- The supported-PDF envelope is stated honestly and exercised against representative legal
+  fixtures. Extractable text alone is not treated as proof that a complex layout has a trustworthy
+  narration order; an accepted document remains inspectable through the prepared-source review.
 - Deterministic processing persists a bounded document map plus ordered sections and paragraphs
   without omitting, duplicating, overlapping, or reordering retained source text.
 - Narration begins at the first paragraph, displays the active paragraph, generates versioned
@@ -116,9 +121,17 @@ reading session.
 - After narration advances, a later Ask creates a new episode at the new paragraph and receives
   every complete earlier interaction from the active reading session.
 - A complete prompt that exceeds the configured limit fails clearly and never silently truncates
-  or summarizes source text, the question, or an active-session turn.
+  or summarizes source text, the question, or an active-session turn. The user can explicitly end
+  that session and start a fresh session at the saved paragraph without inheriting ended-session
+  dialogue; this is a narrow recovery action, not M3's broader start and navigation UI.
+- Ask submissions have stable request identity so retry or double submission cannot persist or
+  display the same logical interaction twice.
 - One fake-provider browser test and one explicit opt-in live-provider run demonstrate the complete
-  M2 loop on the selected benchmark PDF.
+  M2 loop on the selected benchmark PDF, and a second non-benchmark supported PDF exercises the
+  deterministic upload-to-conversation path with fake capabilities.
+- Every M2 ticket leaves a reproducible human-reviewable increment, records its manual walkthrough
+  and evidence in `M2_REVIEW.md`, and receives explicit reviewer acceptance before its dependent
+  ticket becomes `Ready`.
 
 ### M3 — Reader and context expansion
 

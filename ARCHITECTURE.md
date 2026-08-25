@@ -105,7 +105,7 @@ Paragraph is the synchronization unit for highlighting and resume. Pausing midwa
 8. Local context contains document orientation, current section title and cached synopsis, the local passage window, complete active-session dialogue, and the question. Current-section context contains document orientation, the full current section, complete active-session dialogue, and the question. Full-document context contains orientation, the canonical full normalized source, complete active-session dialogue, and the question. Limited document-wide context contains orientation, current-section synopsis, local passage window, complete active-session dialogue, and the question; it does not search the document.
 9. The prompt permits the model to use prior knowledge about an identified work as clearly labeled background. It must treat supplied PDF text as authoritative, distinguish background knowledge and illustrations from the text, and never claim that something appears elsewhere in the uploaded document without supplied evidence. A full-document package can support such a location claim; a limited document-wide package must state the layers examined and that it did not examine the complete document.
    Reading-session dialogue is conversational memory rather than source evidence: an earlier generated answer cannot independently support a new claim about the uploaded document.
-10. The reasoning model returns text. FastAPI stores one complete `Interaction` containing the episode, turn order, transcript, answer, scope, and minimal model metadata; its anchor paragraph is derived through the episode. FastAPI then returns it immediately.
+10. The reasoning model returns text. FastAPI stores one complete `Interaction` containing a globally unique client request ID, the episode, turn order, transcript, answer, scope, and minimal model metadata; its anchor paragraph is derived through the episode. Retrying a completed request ID returns that same interaction and cannot persist another turn. FastAPI then returns it immediately.
 11. The web app displays the answer and requests its MP3 from a separate audio endpoint. Answer TTS therefore has the same retryable, cache-on-demand behavior as paragraph TTS and cannot duplicate the stored interaction.
 12. The browser plays the answer. A further Ask repeats this flow within the same active episode. When the user presses **Continue Reading**, FastAPI ends that episode, retains it inside the active reading session, and resumes narration at its anchored paragraph. A later Ask in the same reading session creates a new episode at the new paragraph and receives the interactions from every earlier episode in that session.
 
@@ -154,7 +154,7 @@ The V0 API surface is:
 | `GET /api/documents/{id}/reader?paragraph_id=...` | Load the selected paragraph and nearby ordered paragraphs | Reader window with stable paragraph IDs |
 | `PUT /api/documents/{id}/position` | Navigate an active session with exactly one of `{ paragraph_id }`, `{ beginning: true }`, or `{ section_id }` | Saved paragraph ID; rejects invalid/cross-document selections and an active episode |
 | `GET /api/paragraphs/{id}/audio` | Get or generate paragraph narration | `audio/mpeg` |
-| `POST /api/documents/{id}/interactions` | Start or continue the active session's conversational episode with question audio; produce transcript plus textual answer | Stored interaction, session ID, and episode ID |
+| `POST /api/documents/{id}/interactions` | Start or continue the active session's conversational episode with question audio and a unique client request ID; produce transcript plus textual answer | Stored interaction, session ID, and episode ID; a completed duplicate request ID returns the same interaction |
 | `POST /api/documents/{id}/episodes/{episode_id}/continue` | End the active episode and resume at its anchor | Ended episode and anchored paragraph ID |
 | `GET /api/interactions/{id}/audio` | Get or generate answer narration | `audio/mpeg` |
 
@@ -172,11 +172,16 @@ uses the persisted ordered section list, including fallback sections, and return
 titles, order, and first paragraph IDs to the reader. Mid-session navigation pauses playback and
 updates the position only when no episode is active; it retains the session and all its
 interactions. Question functions create or validate the single active episode within that session,
-transcribe audio, select the explicit scope rule, lazily generate the current-section synopsis when
-the selected context needs it, build bounded context with all earlier session interactions, request
-an answer, and store the ordered interaction. Continue functions end only the matching episode and
-restore its anchor as the document's reading position. Ending a reading session is a separate
-explicit operation.
+validate the logical Ask's globally unique client request ID, transcribe audio, select the explicit
+scope rule, lazily generate the current-section synopsis when the selected context needs it, build
+bounded context with all earlier session interactions, request an answer, and store the ordered
+interaction. Final persistence enforces request-ID uniqueness; a completed duplicate returns the
+same stored interaction rather than creating another turn, while conflicting ownership or request
+metadata fails clearly. Continue functions end only the matching episode and restore its anchor as
+the document's reading position. Ending a reading session is a separate explicit operation.
+Context-limit recovery may end the session and create a new one with the existing `resume`
+selection, preserving the saved paragraph while excluding ended-session dialogue; this is not a
+separate navigation model.
 
 The context builder is pure application logic: persisted domain data, the active reading session, its active episode, and a question produce an explicit scope and model input. It selects only whole source paragraphs and includes every complete earlier session turn in deterministic episode and turn order; it never queries beyond the RFC's selected source layers. The OpenRouter integration cannot query the database or choose passages.
 
@@ -209,9 +214,9 @@ SQLite runs in WAL mode. Exactly one backend process may write to it or execute 
 | `Paragraph` | ID, section ID, order, text, start/end page |
 | `ReadingSession` | ID, document ID, status (`active` or `ended`), started time, ended time |
 | `ConversationEpisode` | ID, reading session ID, session order, anchored paragraph ID, status (`active` or `ended`), started time, ended time |
-| `Interaction` | ID, episode ID, turn order, question transcript, answer text, context scope, prompt version, OpenRouter model ID, created time |
+| `Interaction` | ID, globally unique client request ID, episode ID, turn order, question transcript, answer text, context scope, prompt version, OpenRouter model ID, created time |
 
-There is at most one active `ReadingSession` per document and at most one active `ConversationEpisode` per reading session. `ConversationEpisode.session_order` is unique and ascending within its session; `Interaction.turn_order` is unique and ascending within its episode. The pair gives every complete session turn a deterministic chronological order. `ConversationEpisode.anchored_paragraph_id` must belong to its session's document. A selectable section's first paragraph is the lowest-order paragraph in that section and must belong to the section's document. Foreign keys are not duplicated when they can be derived: a paragraph determines its section and document, and an interaction determines its session, anchored paragraph, section, and document through its episode. `current_paragraph_id` lives on `Document` because there is one user and one reading position per document.
+There is at most one active `ReadingSession` per document and at most one active `ConversationEpisode` per reading session. `ConversationEpisode.session_order` is unique and ascending within its session; `Interaction.turn_order` is unique and ascending within its episode, and its client request ID is globally unique. The pair of episode and turn order gives every complete session turn a deterministic chronological order, while the request ID makes network retry idempotent without redefining conversational order. `ConversationEpisode.anchored_paragraph_id` must belong to its session's document. A selectable section's first paragraph is the lowest-order paragraph in that section and must belong to the section's document. Foreign keys are not duplicated when they can be derived: a paragraph determines its section and document, and an interaction determines its session, anchored paragraph, section, and document through its episode. `current_paragraph_id` lives on `Document` because there is one user and one reading position per document.
 
 Persist the original PDF, normalized sections and paragraphs, the bounded document map, lazily cached section synopses, processing errors, reading position, reading sessions, episodes, and textual interactions. Do not persist a whole-document or paragraph summary. The question recording is deleted after successful transcription and may also be deleted after a failed request once its error has been returned.
 
@@ -286,7 +291,9 @@ PDF parsing uses `pypdf` only for metadata and outline destinations and `pdfplum
 ### Testing approach
 
 - Unit-test nested-outline flattening, heading detection, paragraph reconstruction, deterministic document-map bounds and omission markers, bounded fallback sections, no-loss/no-overlap ordering, ordered selectable-section serialization and first-paragraph resolution, document-owned navigation validation, rejection while an episode is active, canonical full-document serialization and markers, deterministic full-prompt budget calculation (including instructions, answer reserve, safety margin, complete dialogue, and question), scope rules and limited fallback disclosures, lazy section-synopsis caching, reading-session and episode lifecycle, chronological interaction ordering, whole-session context limits, prior-knowledge prompt guardrails, and audio paths as pure logic.
-- Test processing state transitions and query functions against a temporary SQLite database, including interrupted processing and retry without duplicate rows.
+- Test processing state transitions and query functions against a temporary SQLite database,
+  including interrupted processing, retry without duplicate rows, and duplicate Ask request IDs
+  returning exactly one stored interaction.
 - Replace the three OpenRouter operations with fakes for service and API tests. Keep a small opt-in live OpenRouter smoke test for each configured model.
 - Store small legal PDF fixtures for bookmarks, no bookmarks, long text blocks, and no extractable text.
 - Run the Playwright happy path against the real Next.js and FastAPI apps with a temporary SQLite database and fake OpenRouter operations: upload, wait until ready, play/pause, submit prerecorded audio, display/play an answer, submit a same-episode follow-up, continue, read to another anchor, ask a new question that uses earlier session dialogue, and continue from the new episode's anchor.
@@ -330,3 +337,6 @@ PDF parsing uses `pypdf` only for metadata and outline destinations and `pdfplum
 19. Before narration, start selection is limited to the saved position, document beginning, or a
     persisted ordered section's first paragraph. Active-session navigation preserves session
     dialogue but is rejected until any active episode ends; it never mutates that episode's anchor.
+20. Every logical Ask has stable request identity. Retrying a completed request never persists or
+    returns a second conversational turn, and idempotency never requires a slow external call to run
+    inside a database transaction.

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from margin_api.errors import ApiError
 from margin_api.models import Document, Paragraph, Section
-from margin_api.pdf_processing import PdfProcessingError, ProcessedDocument, process_selected_pdf
+from margin_api.pdf_processing import PdfProcessingError, ProcessedDocument, process_pdf
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
@@ -55,7 +55,7 @@ def process_document(session_factory: sessionmaker[Session], document_id: str) -
         source_path = Path(document.source_path)
 
     try:
-        processed = process_selected_pdf(source_path)
+        processed = process_pdf(source_path)
     except PdfProcessingError as error:
         _mark_failed(session_factory, document_id, "pdf_processing_failed", str(error))
         return
@@ -228,6 +228,6 @@ def _validate_pdf(source: bytes) -> None:
         raise ApiError(
             status_code=415,
             code="unsupported_upload",
-            message="Upload the supported PDF file.",
+            message="Upload a PDF file.",
             retryable=False,
         )

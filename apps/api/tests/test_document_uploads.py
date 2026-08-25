@@ -59,6 +59,28 @@ def test_processing_failure_leaves_no_authoritative_derived_rows(tmp_path: Path)
         assert str(tmp_path) not in (persisted.failure_message or "")
 
 
+def test_encrypted_pdf_failure_leaves_no_authoritative_derived_rows(tmp_path: Path) -> None:
+    factory = _factory(tmp_path)
+    source = (Path(__file__).parent / "fixtures" / "encrypted-text.pdf").read_bytes()
+    document = create_processing_document(factory, tmp_path / "data", source)
+
+    process_document(factory, document.id)
+
+    with factory() as session:
+        persisted = session.get(Document, document.id)
+        assert persisted is not None
+        assert persisted.status == "failed"
+        assert persisted.failure_code == "pdf_processing_failed"
+        assert persisted.failure_message == (
+            "This PDF is encrypted. Upload an unencrypted text-based PDF."
+        )
+        assert persisted.current_paragraph_id is None
+        assert persisted.document_map == []
+        assert session.scalar(select(func.count()).select_from(Section)) == 0
+        assert session.scalar(select(func.count()).select_from(Paragraph)) == 0
+        assert str(tmp_path) not in persisted.failure_message
+
+
 def test_publication_failure_leaves_document_retryable_without_derived_rows(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -87,7 +109,7 @@ def test_publication_failure_leaves_document_retryable_without_derived_rows(
 def test_invalid_upload_is_rejected_before_a_document_is_created(tmp_path: Path) -> None:
     factory = _factory(tmp_path)
 
-    with pytest.raises(ApiError, match="Upload the supported PDF"):
+    with pytest.raises(ApiError, match="Upload a PDF file"):
         create_processing_document(factory, tmp_path / "data", b"not a pdf")
 
     with factory() as session:
@@ -114,7 +136,7 @@ def test_upload_api_returns_a_safe_processing_response(
     assert response.status_code == 415
     assert response.json() == {
         "code": "unsupported_upload",
-        "message": "Upload the supported PDF file.",
+        "message": "Upload a PDF file.",
         "retryable": False,
     }
     assert str(tmp_path) not in response.text
@@ -144,6 +166,55 @@ def test_upload_api_accepts_the_selected_multipart_fixture(
     assert status_response.status_code == 200
     assert status_response.json()["status"] == "ready"
     assert status_response.json()["current_paragraph_id"] is not None
+
+
+def test_upload_api_accepts_a_non_benchmark_text_pdf(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database_path = tmp_path / "api.db"
+    _factory(tmp_path, database_path)
+    monkeypatch.setenv("MARGIN_DATABASE_URL", f"sqlite:///{database_path}")
+    monkeypatch.setenv("MARGIN_DATA_ROOT", str(tmp_path / "data"))
+    get_settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            source = (Path(__file__).parent / "fixtures" / "text-without-outline.pdf").read_bytes()
+            response = client.post("/api/documents", files={"file": ("paper.pdf", source)})
+            assert response.status_code == 202
+            status_response = client.get(f"/api/documents/{response.json()['id']}")
+    finally:
+        get_settings.cache_clear()
+
+    assert status_response.json()["status"] == "ready"
+
+
+def test_review_api_is_ready_only_and_preserves_pagination_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database_path = tmp_path / "api.db"
+    factory = _factory(tmp_path, database_path)
+    monkeypatch.setenv("MARGIN_DATABASE_URL", f"sqlite:///{database_path}")
+    monkeypatch.setenv("MARGIN_DATA_ROOT", str(tmp_path / "data"))
+    get_settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            document = create_processing_document(
+                factory,
+                tmp_path / "data",
+                (Path(__file__).parent / "fixtures" / "text-with-outline.pdf").read_bytes(),
+            )
+            assert client.get(f"/api/documents/{document.id}/review").status_code == 409
+            process_document(factory, document.id)
+            first = client.get(f"/api/documents/{document.id}/review?offset=0&limit=1")
+            second = client.get(f"/api/documents/{document.id}/review?offset=1&limit=1")
+    finally:
+        get_settings.cache_clear()
+
+    assert first.status_code == second.status_code == 200
+    assert first.json()["sections"]
+    assert first.json()["document_map"]
+    assert first.json()["paragraphs"][0]["order"] == 1
+    assert second.json()["paragraphs"][0]["order"] == 2
 
 
 def test_upload_api_rejects_a_non_multipart_body(

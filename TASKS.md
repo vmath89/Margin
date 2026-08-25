@@ -992,7 +992,9 @@ The application foundation has a documented, repeatable verification procedure a
 - At M1 completion, M2 had six ordered, dependency-aware tickets based on evidence rather than
   speculative implementation detail, and only M2-T01 was `Ready`. The M2-T02 human checkpoint
   subsequently added M2-T02A to make general text-PDF processing an explicit gate before reader
-  work.
+  work. A later planning review added M2-T02B and M2-T04A, split M2-T05 into M2-T05A and M2-T05B,
+  and strengthened M2-T06 so each remaining increment is separately human-reviewable; those later
+  corrections do not change what M1-T12 originally established.
 - M3 and M4 retain the deferred V0 ideas at outcome level for evidence-based review after the
   preceding milestone.
 
@@ -1008,9 +1010,10 @@ The application foundation has a documented, repeatable verification procedure a
 
 M2 is the narrowest useful vertical slice of Margin's defining interaction. It uses the completed
 M1 extraction, recording, reasoning, TTS, persistence, and same-origin evidence to let one user
-upload a supported text-based PDF, listen linearly from the beginning, pause, hold a grounded
-spoken conversation, continue, and later ask a new question that retains every earlier discussion
-from the active reading session.
+upload a supported, primarily linear text-based PDF within the configured limits, listen linearly
+from the beginning, pause, hold a grounded spoken conversation, continue, and later ask a new
+question that retains every earlier discussion from the active reading session. M2-T02B defines and
+tests that support envelope; M2 does not promise reliable processing for every possible PDF layout.
 
 M2 still creates the architecture's lossless ordered sections and bounded document map because the
 persisted schema and source-order invariants require them. It deliberately does not expose section
@@ -1028,6 +1031,21 @@ alongside the normal acceptance criteria and verification results. The checkpoin
 reviewer oriented: what now works, what can be inspected directly, what evidence should be shown,
 what feedback is needed, and what is intentionally still unavailable. A checkpoint does not replace
 automated verification or silently add scope to the ticket.
+
+Every M2 implementation ticket must also leave one reproducible human-reviewable increment. A
+ticket may become `Done` only after its automated checks pass and the reviewer accepts its manual
+walkthrough. Its dependent ticket may become `Ready` only after that acceptance is recorded in
+`M2_REVIEW.md`. Each walkthrough must provide the exact reviewed commit, documented start
+procedure, a short happy path, at least one failure or edge case, expected visible or inspectable
+results, actual observations, known limitations, and one reviewer decision: `Accepted`, `Changes
+requested`, or `Follow-up ticket required`.
+
+A backend-oriented ticket may use a deterministic API trace or purpose-built inspection harness
+instead of polished product UI, but the reviewer must be able to reproduce and understand the
+result; code existence and automated tests alone are not human acceptance. A failure against the
+active ticket's criteria keeps that ticket open. Necessary M2 work outside its current scope becomes
+a separate dependency-gated ticket, deferred V0 work is recorded for the post-M2 M3 review, and a
+post-V0 idea goes to `FUTURE_IDEAS.md`.
 
 ## M2-T01 — Build the deterministic selected-PDF processing pipeline
 
@@ -1145,14 +1163,17 @@ atomically persisted document backed by the ordered output from M2-T01.
 
 ## M2-T02A — Generalize upload and processing to text-based PDFs
 
-**Status:** Ready
+**Status:** In Progress
 **Depends on:** M2-T01, M2-T02
 
 ### Outcome
 
-A user can upload any PDF with extractable text within the configured size limit—not only the
-development benchmark—and receive one atomically persisted, readable document. The Constitution
-fixture remains a regression fixture and evaluation document, never an upload allowlist.
+A user can upload a supported PDF with extractable text within the configured size limit—not only
+the development benchmark—and receive one atomically persisted, readable document. This ticket
+removes the fixture allowlist but does not claim that every extractable or visually complex PDF has
+a trustworthy reading order; M2-T02B validates and documents that support envelope. The
+Constitution fixture remains a regression fixture and evaluation document, never an upload
+allowlist.
 
 ### Scope
 
@@ -1217,6 +1238,8 @@ fixture remains a regression fixture and evaluation document, never an upload al
   is ready and preservation of section, paragraph, and page-marker order.
 - Verify migration-backed persistence against a fresh database and perform a real-browser upload
   of at least one non-benchmark text-based PDF.
+- Record the reviewed commit, setup steps, happy path, failure path, expected and actual source
+  observations, limitations, automated results, and reviewer decision in `M2_REVIEW.md`.
 
 ### Human checkpoint
 
@@ -1237,10 +1260,80 @@ fixture remains a regression fixture and evaluation document, never an upload al
 - **Not available yet:** Play, Pause, narration, Ask, follow-ups, and Continue are not expected to
   work.
 
-## M2-T03 — Deliver linear listening from the document beginning
+## M2-T02B — Define and validate the supported text-PDF envelope
 
 **Status:** Backlog
 **Depends on:** M2-T02A
+
+### Outcome
+
+Margin has an honest, tested definition of which text-based PDFs it can prepare reliably before
+narration and conversation depend on the normalized source order.
+
+### Scope
+
+- Document the supported input envelope: PDF-format validation, extractable text, configured file
+  and extracted-text limits, initial language expectations, supported layout expectations, and
+  explicitly unsupported cases. Product language must say `supported text-based PDF`, not imply
+  that every possible PDF is accepted.
+- Expand the legally usable fixture matrix to exercise an ordinary single-column document, usable
+  outline, no usable outline, repeated headers or footers, line-end hyphenation, multi-column text,
+  long paragraphs, image-only input, encryption, malformed input, and non-extractable input.
+- For each complex layout, make an explicit, evidence-backed decision to process it correctly or
+  reject/document it as unsupported. A file is not considered readable merely because a parser can
+  return some characters.
+- Confirm through the prepared-source review that every accepted fixture has intelligible canonical
+  reading order without silent omission, duplication, overlap, or reordering.
+- Keep narration, conversation, OCR, table interpretation, mathematical-layout understanding, and
+  arbitrary visual-layout recovery outside this compatibility gate.
+
+### Out of scope
+
+- OCR, handwritten documents, cloud conversion, semantic interpretation of tables or equations,
+  and a promise of arbitrary-PDF compatibility.
+- Reader controls, narration, model calls, and conversation behavior.
+
+### Acceptance criteria
+
+- User-facing and planning language states the tested support boundary and does not claim literal
+  support for every PDF.
+- Every accepted fixture has complete canonical traversal and manually intelligible reading order
+  in the prepared-source review.
+- A complex fixture that cannot be reconstructed reliably is rejected clearly or documented as
+  unsupported rather than silently published as trustworthy narration text.
+- The support matrix records the expected and observed result for every fixture category.
+- `M2-T03` remains dependency-gated until the reviewer accepts the compatibility walkthrough.
+
+### Verification
+
+- Run deterministic parsing, normalization, canonical-order, and failure tests over the expanded
+  legal fixture matrix.
+- In the real browser, upload and inspect every accepted fixture category that exercises a distinct
+  layout rule and demonstrate at least one clear unsupported-input failure.
+- Record the reviewed commit, compatibility matrix, walkthrough observations, and reviewer decision
+  in `M2_REVIEW.md`.
+
+### Human checkpoint
+
+- **Project state:** The reviewer can now distinguish PDFs Margin reliably supports from inputs it
+  must reject or describe as unsupported before audio makes extraction defects harder to inspect.
+- **What was accomplished:** The phrase `supported text-based PDF` has a concrete fixture-backed
+  meaning, including explicit decisions for representative layout and failure cases.
+- **What to inspect:** Open the prepared-source review for each accepted layout category and compare
+  representative headings, headers or footers, hyphenation, columns, long paragraphs, and page
+  transitions with the source PDF. Inspect at least one rejected case.
+- **Evidence to request:** The support matrix, fixture provenance, deterministic checks, browser
+  walkthrough, source-order assertions, and the exact reviewed commit.
+- **Feedback needed:** Accept the support boundary or identify a fixture whose output is not natural
+  enough to narrate. A required correction keeps this ticket open; a broader format ambition becomes
+  a separate ticket.
+- **Not available yet:** No accepted document can be narrated or discussed until M2-T03 and later
+  tickets are complete.
+
+## M2-T03 — Deliver linear listening from the document beginning
+
+**Status:** Backlog
+**Depends on:** M2-T02B
 
 ### Outcome
 
@@ -1255,8 +1348,11 @@ paragraph, and explicitly play or pause narration.
   canonical paragraph transitions.
 - Generate or reuse disposable paragraph MP3 audio on demand through the application-owned speech
   operation and the M1 versioned cache-addressing contract; validate bytes before publishing them.
+- Read only the ready document's persisted canonical paragraphs; narration must not reparse the PDF
+  or create a second text or ordering model.
 - Build the minimal listening screen with the active paragraph, Play, and Pause. Reserve
-  **Continue Reading** for ending a conversational episode in M2-T04 and M2-T05.
+  **Continue Reading** for ending a conversational episode in M2-T04 and exposing that behavior in
+  M2-T04A.
 - Advance automatically after successful paragraph playback and stop clearly at the document end.
 - Treat a paragraph as the synchronization unit. Pausing midway leaves that paragraph current;
   resuming after an ordinary Pause may continue browser playback, while Continue after a
@@ -1277,12 +1373,15 @@ paragraph, and explicitly play or pause narration.
 - Failed audio generation leaves the current paragraph unchanged and exposes a stable error.
 - Cache keys change whenever a byte-affecting TTS configuration input changes; prefetch and broader
   cache policy remain deferred.
+- Starting narration uses the accepted prepared-source hierarchy exactly as reviewed in M2-T02B.
 
 ### Verification
 
 - Run narration service and API tests with deterministic fake speech, an isolated database, and
   isolated local cache paths.
 - Run focused browser tests for start, Play, Pause, automatic advance, failure, and document end.
+- Record the reviewed commit, happy-path playback, one audio-generation failure, actual observations,
+  limitations, and reviewer decision in `M2_REVIEW.md`.
 
 ### Human checkpoint
 
@@ -1297,7 +1396,7 @@ paragraph, and explicitly play or pause narration.
   canonical transition checks, an audio-generation failure example, and cache-version evidence.
 - **Feedback needed:** Comment on whether the basic Play/Pause behavior and paragraph highlighting
   are understandable. Do not judge final voice quality yet because normal verification still uses
-  fake speech and production OpenRouter integration arrives in M2-T05.
+  fake speech and production OpenRouter integration arrives in M2-T05A.
 - **Not available yet:** Ask, spoken questions, answers, follow-ups, navigation, speed controls, and
   reload resume remain unavailable.
 
@@ -1316,6 +1415,13 @@ same reading session.
 
 - Add the interaction operation that accepts a bounded browser-compatible recording for the active
   reading session and validates that its paragraph belongs to the document.
+- Require a client-generated request ID for each logical Ask and enforce its uniqueness at the
+  persistence boundary. Repeating an ID for an already completed Ask returns that stored
+  interaction; a genuine follow-up receives a new ID. Frontend submission guards may improve the
+  experience later but are not the backend correctness mechanism.
+- Add the focused Alembic/schema change required for globally unique interaction request IDs. Reuse
+  of an existing ID with conflicting document, episode, or request metadata fails clearly rather
+  than returning an interaction from a different logical Ask.
 - Transcribe through the application-owned operation. The normalized transcript must fit the M1
   question limit or fail clearly without silent truncation.
 - On the first successful Ask at a paused position, create an active conversational episode with an
@@ -1336,6 +1442,10 @@ same reading session.
 - Generate the textual answer through the application-owned operation and persist one complete
   Interaction only after transcription and answer generation succeed. Do not hold a database
   transaction open during transcription, reasoning, or speech synthesis.
+- Return stable application error codes for invalid or oversized recordings, excessive transcript
+  length, missing active session, invalid document-owned paragraph, context-limit exhaustion,
+  transcription failure, and reasoning failure so later browser work can recover without parsing
+  provider messages.
 - Add separate on-demand answer-audio and Continue operations. Continue ends only the matching
   episode, preserves the reading session and all its interactions, restores the episode anchor as
   current, and returns that paragraph for narration from its beginning.
@@ -1362,6 +1472,10 @@ same reading session.
   source paragraph, interaction, or question.
 - Failed transcription or reasoning creates no incomplete Interaction, and retry cannot duplicate
   a completed Interaction.
+- Repeating the same Ask request ID persists and returns exactly one interaction, while a new
+  request ID creates one new chronologically ordered turn.
+- Reusing a request ID with conflicting ownership or logical request metadata fails without exposing
+  or duplicating the original interaction.
 - New claims about the PDF are grounded in the source text supplied for the current request, not in
   an earlier generated answer.
 - A question that cannot be supported by the provisional local package receives an honest context
@@ -1371,6 +1485,9 @@ same reading session.
 
 - Run pure prompt/context-budget tests, session and episode state-transition tests, and interaction
   API tests against an isolated migrated database with fake transcription, reasoning, and speech.
+- Run duplicate-request and stable-error mapping tests, then record the reviewed commit, deterministic
+  trace, happy path, failure path, actual observations, limitations, and reviewer decision in
+  `M2_REVIEW.md`.
 
 ### Human checkpoint
 
@@ -1379,28 +1496,106 @@ same reading session.
 - **What was accomplished:** Margin can create an anchored discussion, retain follow-ups at that
   anchor, end it with Continue, and carry all completed discussion into a later anchored episode in
   the same reading session.
-- **What to inspect:** Review one recorded test trace showing the first question, a follow-up, the
-  episode ending, narration moving to another paragraph, and a later question receiving the earlier
-  dialogue. Inspect the exact provisional local source window supplied for both episodes.
+- **What to inspect:** Reproduce one deterministic trace showing the first question, a follow-up,
+  the episode ending, narration moving to another paragraph, and a later question receiving the
+  earlier dialogue. Inspect the reading-session ID, episode IDs and anchors, ordered interactions,
+  exact provisional local source window, separately labeled dialogue, selected scope, and current
+  paragraph returned by Continue. Also repeat one request ID and trigger one stable failure.
 - **Evidence to request:** Prompt snapshots with source/dialogue labels, chronological interaction
-  ordering tests, context-limit rejection tests, transaction-boundary evidence, and proof that
-  ended-session dialogue is excluded.
+  ordering tests, duplicate-request results, context-limit rejection tests, transaction-boundary
+  evidence, proof that ended-session dialogue is excluded, and the exact reviewed commit. The trace
+  must use a legal fixture and must not establish production logging of private prompts.
 - **Feedback needed:** Confirm that the conversation-memory behavior matches the intended mental
   model: Continue ends the current pause but does not make the active reading session forget. Flag
   any answer that appears to treat an earlier AI response as evidence from the PDF.
 - **Not available yet:** This is not a polished browser conversation, and fake answers cannot be
   used to judge explanation quality, transcription quality, or voice quality.
 
-## M2-T05 — Connect the spoken question-and-answer interface
+## M2-T04A — Make conversation and session boundaries reviewable in the browser
 
 **Status:** Backlog
 **Depends on:** M2-T04
 
 ### Outcome
 
-A user can pause narration, record a spoken question, see and hear the answer, ask spoken
-follow-ups, continue reading, and later start a new conversation that naturally uses the earlier
-discussion from the active reading session.
+A human reviewer can exercise the complete episode and reading-session memory model through a
+minimal browser flow with deterministic fake capabilities, including an explicit recovery path when
+the active session no longer fits the prompt budget.
+
+### Scope
+
+- Add the minimum browser conversation surface needed to pause, submit a bounded recording to fake
+  transcription, display the normalized transcript and fake textual answer, Ask again, and Continue
+  Reading. This is the first inspectable interaction UI, not final provider or visual polish.
+- Keep narration paused throughout an active episode and prevent browser playback changes from
+  mutating its immutable anchor.
+- Expose **End Reading Session** as a secondary action. Add a narrow **Start New Session Here**
+  recovery action that ends the active session, uses the existing saved paragraph as the new
+  session's start, and carries no ended-session dialogue. It uses the architecture's existing end
+  and resume semantics and is not a general M3 start-location or navigation control.
+- Map the context-limit error to that recovery action. Other stable M2-T04 errors return the UI to a
+  defined safe state without advancing narration or changing the anchor.
+- Prevent ordinary double submission in the browser while relying on M2-T04 request identity for
+  persisted correctness.
+- Add focused component and cross-boundary tests with deterministic fake operations for Ask,
+  follow-up, Continue, later-episode memory, explicit session end, fresh-session exclusion,
+  duplicate submission, and context-limit recovery.
+
+### Out of scope
+
+- Production OpenRouter calls, judgment of transcription or voice quality, streaming, typed chat,
+  section navigation, arbitrary start selection, cross-session memory, conversation summarization,
+  previous paragraph, speed controls, reload-resume UI, and polished retry workflows.
+
+### Acceptance criteria
+
+- The browser visibly supports Pause → Ask → Answer → Ask again or Continue using fake capabilities.
+- A same-episode follow-up keeps its original anchor, and a later episode receives all earlier
+  dialogue from the still-active reading session.
+- Continue ends only the episode; End Reading Session ends the whole memory boundary.
+- Start New Session Here preserves the saved paragraph, creates fresh session context, and excludes
+  every interaction from the ended session.
+- A simulated context-limit failure presents that usable recovery action rather than instructing
+  the user to perform an unavailable operation.
+- Double submission cannot create or display two copies of one logical Ask, and every error leaves
+  narration, session, episode, and paragraph state explicit.
+
+### Verification
+
+- Run browser-component and API-boundary tests with deterministic fake operations for the complete
+  state sequence and named failures.
+- In a real browser, reproduce same-episode follow-up, Continue, later-episode memory, session end,
+  Start New Session Here, context-limit recovery, and one failed Ask.
+- Record the reviewed commit, setup steps, happy path, failure path, expected and actual state,
+  limitations, and reviewer decision in `M2_REVIEW.md`.
+
+### Human checkpoint
+
+- **Project state:** The defining conversation and memory behavior is now visible in the product
+  with deterministic answers; real provider quality is still intentionally absent.
+- **What was accomplished:** A reviewer can distinguish Continue from End Reading Session, observe
+  memory across pauses, and reset the context at the saved paragraph when required.
+- **What to inspect:** Ask and follow up at one paragraph, Continue, advance and ask a question that
+  refers to the earlier discussion, then end the session and use Start New Session Here. Confirm the
+  next Ask has no earlier dialogue. Trigger the simulated context-limit and failed-Ask paths.
+- **Evidence to request:** Browser walkthrough, component and boundary checks, displayed session and
+  anchor behavior, duplicate-submission evidence, fresh-session exclusion, and reviewed commit.
+- **Feedback needed:** Confirm that Ask again, Continue, End Reading Session, and Start New Session
+  Here communicate four distinct actions. Required clarity or state corrections keep this ticket
+  open.
+- **Not available yet:** Fake transcripts, answers, and audio cannot be used to judge live model,
+  microphone, or voice quality.
+
+## M2-T05A — Connect production OpenRouter capabilities
+
+**Status:** Backlog
+**Depends on:** M2-T04A
+
+### Outcome
+
+The existing application-owned text generation, transcription, and speech operations can use the
+configured production OpenRouter endpoints without exposing provider credentials or weakening the
+deterministic fake-capability path.
 
 ### Scope
 
@@ -1408,67 +1603,139 @@ discussion from the active reading session.
   transcription, and speech-synthesis operations, with backend-only credentials, configured model
   IDs, explicit timeouts, stable error mapping, and one bounded retry for documented transient
   failures.
-- When narration is paused, expose Ask. Record at most the configured duration as the M1-verified
-  WebM/Opus format, show explicit recording and submission states, and send it through same-origin
-  `/api` routes.
-- Display the normalized user transcript and textual answer so transcription and grounding remain
-  inspectable, then request and play answer audio separately.
-- While an episode is active, expose Ask again and Continue Reading. Ask again records a follow-up;
-  Continue ends the episode and restarts narration from the anchored paragraph.
-- After narration reaches a later paragraph, the next Ask must create a visibly new anchored
-  episode while the answer can naturally use the earlier session dialogue.
-- Keep the reader paused throughout an active episode and prevent playback state from silently
-  changing the episode anchor.
-- Add focused provider-boundary tests with mocked HTTP plus browser-component and cross-boundary
-  tests using fake application capabilities.
+- Centralize backend-only authentication, model and voice selection, request IDs, timeouts, one
+  bounded transient retry, response and MP3 validation, safe diagnostics, and stable application
+  error mapping at this narrow boundary.
+- Preserve separate paragraph-audio and answer-audio generation so a speech failure does not erase
+  authoritative text or duplicate an interaction.
+- Add mocked-HTTP provider-boundary coverage for success, transient retry, permanent failure,
+  timeout, malformed response, and invalid audio without requiring network access.
+- Keep live checks explicit and opt-in. Exercise each configured capability through the application
+  boundary and record latency, provider failure, transcription, reasoning, and voice observations
+  without committing credentials, recordings, generated audio, or full sensitive prompts.
+
+### Out of scope
+
+- Final microphone and conversation UI refinement, streaming, WebSockets, wake words, voice
+  activity detection, answer interruption, provider registries, direct underlying-provider
+  credentials, section navigation, broader context scopes, and production hardening.
+
+### Acceptance criteria
+
+- All three production operations satisfy their M1-verified wire-format and response contracts.
+- Transient errors receive at most one bounded retry; permanent and malformed responses map to
+  stable application errors without provider-message parsing in the browser.
+- Paragraph and answer MP3 bytes are validated before cache publication, and failed answer speech
+  leaves the stored textual interaction intact and retryable.
+- The deterministic fake path remains the default for normal automated verification.
+- Browser responses and frontend variables contain no provider credentials or backend-only model
+  configuration, and diagnostics omit full passages, prompts, answers, and audio.
+
+### Verification
+
+- Run provider-boundary tests with mocked HTTP and the relevant backend checks without network
+  access.
+- Run explicit opt-in smoke checks for configured text generation, transcription, and speech when
+  credentials are available.
+- Record the reviewed commit, configuration used without secret values, happy and failure paths,
+  measured observations, limitations, and reviewer decision in `M2_REVIEW.md`.
+
+### Human checkpoint
+
+- **Project state:** Real provider capabilities are connected behind the already reviewable fake
+  conversation flow; the final live browser interaction has not yet passed its own UI checkpoint.
+- **What was accomplished:** Text generation, browser-compatible transcription, paragraph speech,
+  and answer speech use one backend-only OpenRouter boundary with explicit operational behavior.
+- **What to inspect:** Review mocked boundary cases, then run the opt-in capability checks. Compare
+  the transcript with the legal recording, inspect the textual answer's grounding, listen to both
+  speech outputs, and examine latency and safe error reporting.
+- **Evidence to request:** Mocked test results, opt-in results when credentials are available,
+  response and audio validation evidence, retry counts, safe diagnostics, and the reviewed commit.
+- **Feedback needed:** Judge provider accuracy, answer usefulness, latency, and voice acceptability.
+  A blocking capability problem remains in this ticket or becomes an explicit dependency-gated
+  correction rather than being hidden in browser polish.
+- **Not available yet:** The production capabilities have not yet been accepted through the complete
+  actual-microphone conversational reader; M2-T05B owns that integrated interface.
+
+## M2-T05B — Deliver the production spoken conversational reader
+
+**Status:** Backlog
+**Depends on:** M2-T05A
+
+### Outcome
+
+A user can pause narration, record a real spoken question, inspect and hear the answer, ask spoken
+follow-ups, continue reading, and later begin a new anchored conversation that naturally uses every
+earlier discussion from the active reading session.
+
+### Scope
+
+- Replace the fake-only recording path with the M1-verified bounded WebM/Opus MediaRecorder flow
+  while retaining deterministic fakes for normal automated tests.
+- Show explicit permission, recording, submitting, waiting, transcript, textual-answer,
+  answer-audio, and failure states. Display the normalized transcript and textual answer before or
+  independently of answer-audio success.
+- Preserve the M2-T04A Ask again, Continue Reading, End Reading Session, Start New Session Here,
+  anchor, memory, duplicate-submission, and context-limit recovery behavior with production
+  capabilities.
+- Keep narration paused throughout an active episode. A failure must return the reader to a defined
+  safe state without advancing narration, ending the wrong boundary, or moving the anchor.
+- Make answer audio separately retryable when the stored textual answer already exists.
+- Add focused component and cross-boundary tests for microphone permission denial, empty or invalid
+  recording, transcription failure, reasoning failure, answer-audio failure, double submission,
+  follow-up, Continue, later-episode memory, and fresh-session recovery.
 
 ### Out of scope
 
 - Typed chat, streaming, WebSockets, wake words, voice activity detection, answer interruption,
-  polished retry workflows, section navigation, previous paragraph, playback speed, reload resume,
-  and broader context scopes.
+  section navigation, previous paragraph, playback speed, reload-resume UI, complete section or
+  document context, broad retry hardening, and visual polish beyond a clear usable loop.
 
 ### Acceptance criteria
 
-- The visible flow is Play or Pause during narration, Ask while paused, and Ask again or Continue
-  Reading during an active conversation.
-- The transcript and answer appear on screen, and paragraph and answer audio are playable.
-- A follow-up remains anchored to the original paragraph; Continue resumes from the beginning of
-  that paragraph without ending the reading session.
-- A later Ask at a new paragraph demonstrates carried dialogue from the earlier ended episode.
-- Browser requests use only same-origin `/api` routes, and provider credentials or backend-only
-  configuration never enter frontend variables or responses.
+- The visible flow is Narrating → Paused → Recording → Submitting → Answer ready or Answer audio
+  playing → Ask again or Continue, with an explicit safe state for every named failure.
+- The real transcript and answer appear on screen, and paragraph and answer audio are independently
+  playable.
+- Follow-up, Continue, later-episode memory, explicit session end, and fresh-session recovery retain
+  the state semantics accepted in M2-T04A.
+- A failed answer-audio request leaves the textual answer visible and retryable without creating a
+  duplicate interaction.
+- Browser requests remain same-origin `/api`; provider credentials and backend-only configuration
+  never enter frontend variables or responses.
 
 ### Verification
 
-- Run provider-boundary tests without network access and the relevant backend and frontend tests.
-- Exercise recording, transcript display, answer playback, follow-up, Continue, and later Ask in a
-  real browser with fake capabilities and inspect runtime and console errors.
+- Run the relevant backend, frontend, mocked-provider, component, and cross-boundary tests with
+  deterministic capabilities.
+- In a real browser with actual microphone permission, exercise B1, its S1 follow-up, Continue, and
+  the later S3-style question using production providers; inspect runtime and console failures.
+- Exercise permission denial, one failed Ask, and answer-audio retry without losing text.
+- Record the reviewed commit, setup steps, full happy path, failure paths, actual observations,
+  limitations, and reviewer decision in `M2_REVIEW.md`.
 
 ### Human checkpoint
 
-- **Project state:** The first genuinely usable conversational-reading loop exists. It has not yet
-  passed the complete M2 integration gate.
-- **What was accomplished:** A user can listen, pause, record a question, inspect the transcript,
-  read and hear an answer, ask a follow-up, continue, and later ask a new question that remembers
-  the earlier discussion.
-- **What to inspect:** Use an actual microphone with the selected PDF. Try the B1 question, its S1
-  follow-up, Continue, and the later S3-style question. Check the recording states, transcript,
-  answer usefulness, spoken answer, and restart from the anchored paragraph.
-- **Evidence to request:** The browser walkthrough with fake capabilities, mocked provider-boundary
-  test results, one explicit live-provider demonstration when credentials are available, and proof
-  that the browser never receives provider credentials.
-- **Feedback needed:** Human product feedback is important here. Record whether asking feels natural,
-  whether transcription is accurate, whether answers are useful and appropriately grounded,
-  whether the voices are acceptable, and whether Ask again versus Continue is clear. Material
-  problems should become explicit follow-up work rather than being hidden in M2-T06.
-- **Not available yet:** Section navigation, previous paragraph, speed controls, reload resume,
-  complete section/document context, polished retries, and production hardening remain deferred.
+- **Project state:** The first genuinely usable spoken conversational-reading loop exists. It has
+  not yet passed the complete M2 integration gate.
+- **What was accomplished:** A user can listen, pause, speak a question, inspect the transcript,
+  read and hear an answer, ask a spoken follow-up, continue, and later ask a new question that
+  remembers the active session's earlier discussion.
+- **What to inspect:** Use an actual microphone with the selected PDF. Perform B1, S1, Continue, and
+  the S3-style later question. Then inspect permission denial, one failed Ask, answer-audio retry,
+  explicit session end, and Start New Session Here.
+- **Evidence to request:** Fake-capability and mocked-provider checks, live browser walkthrough,
+  stable failure states, absence of browser credentials, and the reviewed commit.
+- **Feedback needed:** Judge whether asking feels natural, transcription is accurate, answers are
+  useful and grounded, voices are acceptable, and the four boundary actions are clear. Material
+  problems become explicit corrections rather than being hidden in M2-T06.
+- **Not available yet:** Section navigation, previous paragraph, speed controls, reload-resume UI,
+  complete section/document context, broad hardening, and final V0 evidence remain deferred.
 
 ## M2-T06 — Verify the first end-to-end prototype
 
 **Status:** Backlog
-**Depends on:** M2-T05
+**Depends on:** M2-T05B
 
 ### Outcome
 
@@ -1483,6 +1750,12 @@ recorded opt-in live-provider evaluation on the selected benchmark PDF.
 - Cover upload, preparation, start from the beginning, narration, Pause, one recorded question,
   answer display and playback, a same-episode follow-up, Continue, advancement to a later paragraph,
   a new question that uses the earlier discussion, and Continue from the new episode's anchor.
+- In that deterministic flow, also prove duplicate-Ask protection, explicit session end, Start New
+  Session Here at the saved paragraph, and exclusion of ended-session dialogue after the reset.
+- Add a second deterministic flow for one committed non-benchmark supported PDF: upload, inspect
+  ready preparation, narrate across multiple paragraphs, pause, submit one grounded question, play
+  its answer, and Continue from the anchor. This verifies that general-PDF support reaches the
+  complete product rather than stopping at the preparation screen.
 - Use committed prerecorded legal audio fixtures for deterministic Playwright submission; test the
   MediaRecorder interaction separately at the browser-component boundary.
 - Run one explicit opt-in live-provider browser session on the checksum-pinned benchmark PDF using
@@ -1491,6 +1764,9 @@ recorded opt-in live-provider evaluation on the selected benchmark PDF.
 - Record basic transcription, narration, answer, and total interaction latency; provider failures;
   grounding quality; and interaction friction. Do not turn this ticket into broad hardening or
   benchmark evaluation.
+- Exercise context-limit recovery plus representative transcription, reasoning, narration-audio,
+  and answer-audio failures. Answer-audio failure must preserve its textual answer, and narration
+  failure must not advance the paragraph.
 - Reconcile the integrated result against every M2 exit criterion in `ROADMAP.md` and record
   discoveries for the post-M2 M3 review without decomposing M3 in this ticket.
 
@@ -1506,11 +1782,16 @@ recorded opt-in live-provider evaluation on the selected benchmark PDF.
   network access or provider credentials.
 - The automated flow proves same-episode follow-up, Continue semantics, a new later paragraph
   anchor, complete earlier active-session dialogue, and resume from the new episode's anchor.
+- The automated flow proves duplicate-request safety, explicit session reset at the saved paragraph,
+  and exclusion of ended-session dialogue after reset.
+- A non-benchmark supported fixture completes the deterministic upload-to-conversation flow.
 - The opt-in live run successfully exercises real browser recording plus production STT, reasoning,
   paragraph TTS, and answer TTS, or records a concrete provider failure without weakening the
   deterministic completion gate.
 - Basic live observations and post-M2 discoveries are recorded without committing recordings,
   private source material, generated audio, credentials, or full sensitive prompts.
+- Named failure paths leave authoritative text, interaction, anchor, and paragraph state intact and
+  offer the recovery action established by their owning ticket.
 - Every M2 exit criterion in `ROADMAP.md` is demonstrable before M2 is marked complete.
 
 ### Verification
@@ -1519,6 +1800,8 @@ recorded opt-in live-provider evaluation on the selected benchmark PDF.
   lint, frontend type checking, migrations, and Playwright command.
 - Run the live-provider browser sequence explicitly and opt-in, then inspect browser and API logs
   for errors and sensitive-content leakage.
+- Record the reviewed commit, complete command results, both deterministic flows, live observations,
+  failure walkthroughs, remaining limitations, and reviewer decision in `M2_REVIEW.md`.
 
 ### Human checkpoint
 
@@ -1527,12 +1810,14 @@ recorded opt-in live-provider evaluation on the selected benchmark PDF.
   complete hardened V0.
 - **What was accomplished:** The full upload, listen, pause, spoken Ask, follow-up, Continue, later
   session-aware Ask, and anchored resume sequence is repeatable across the real browser/API boundary.
-- **What to inspect:** Watch the deterministic end-to-end flow, then perform or review the opt-in
-  live run. Compare the experience with manually switching between a reader and a general-purpose
-  assistant, focusing on continuity rather than visual polish.
+- **What to inspect:** Watch the benchmark and non-benchmark deterministic flows, including session
+  reset and named failures, then perform or review the opt-in live run. Compare the experience with
+  manually switching between a reader and a general-purpose assistant, focusing on continuity
+  rather than visual polish.
 - **Evidence to request:** The complete verification command results, Playwright evidence, the M2
-  roadmap checklist, live-run latency and failure notes, grounding observations, and a concise list
-  of discoveries proposed for the M3 review.
+  roadmap checklist, non-benchmark end-to-end evidence, session-reset evidence, live-run latency and
+  failure notes, grounding observations, reviewed commit, and a concise list of discoveries proposed
+  for the M3 review.
 - **Feedback needed:** Explicit human sign-off is required before treating M2 as complete and
   decomposing M3. Decide whether the core loop is coherent enough to expand, which observed issues
   must be fixed first, and which deferred M3 ideas now appear most valuable. Do not select V1 work

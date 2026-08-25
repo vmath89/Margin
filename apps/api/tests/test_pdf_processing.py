@@ -5,124 +5,166 @@ from pathlib import Path
 import pytest
 
 from margin_api.pdf_processing import (
-    DOCUMENT_MAP_MAX_ENTRIES,
     LayoutLine,
     PdfProcessingError,
-    ProcessedParagraph,
-    _DraftSection,
-    apply_section_policy,
     canonical_paragraphs,
     join_lines,
-    process_selected_pdf,
-    reconstruct_selected_pdf,
+    process_pdf,
+    reconstruct_document,
 )
 
 
-def line(source_id: str, text: str, *, page: int = 1, top: float = 100.0) -> LayoutLine:
-    return LayoutLine(source_id, page, top, top + 8, 30.0, text, 10.0, "Roman")
+def line(
+    source_id: str,
+    text: str,
+    *,
+    page: int = 1,
+    top: float = 100.0,
+    font_size: float = 10.0,
+    font_name: str = "Roman",
+) -> LayoutLine:
+    return LayoutLine(source_id, page, top, top + 8, 30.0, text, font_size, font_name)
 
 
-def test_reconstruction_preserves_selected_heading_and_line_order() -> None:
+def test_fallback_sections_preserve_every_line_in_canonical_order() -> None:
     lines = [
-        line("p1:1", "Cover text", top=50),
-        line("p1:2", "Article. I.", top=75),
-        line("p1:3", "Section 1. The legislative Power shall be vested.", top=100),
-        line("p1:4", "Section 2. The House shall choose their Speaker.", top=125),
+        line("p1:1", "One complete paragraph.", top=50),
+        line("p1:2", "A second complete paragraph.", top=80),
     ]
 
-    sections = reconstruct_selected_pdf(lines)
+    sections = reconstruct_document(lines, [])
 
-    assert [section.title for section in sections] == ["Front matter", "Article I"]
-    assert sections[1].source_line_ids == ("p1:2",)
-    assert [paragraph.text for paragraph in sections[1].paragraphs] == [
-        "Section 1. The legislative Power shall be vested.",
-        "Section 2. The House shall choose their Speaker.",
+    assert [section.boundary_source for section in sections] == ["fallback"]
+    assert [paragraph.text for paragraph in sections[0].paragraphs] == [
+        "One complete paragraph.",
+        "A second complete paragraph.",
     ]
-    consumed: list[str] = []
-    for section in sections:
-        consumed.extend(section.source_line_ids)
-        for paragraph in section.paragraphs:
-            consumed.extend(paragraph.source_line_ids)
-    assert consumed == ["p1:1", "p1:2", "p1:3", "p1:4"]
-
-
-def test_section_policy_keeps_small_named_sections_and_splits_only_at_paragraphs() -> None:
-    paragraphs = [
-        ProcessedParagraph(0, "one" * 4, 1, 1, ("one",)),
-        ProcessedParagraph(0, "two" * 4, 1, 1, ("two",)),
-        ProcessedParagraph(0, "three" * 4, 1, 1, ("three",)),
-    ]
-    drafts = [
-        _DraftSection("Amendment I", "heading", ("heading",), [paragraphs[0]]),
-        _DraftSection("Article I", "heading", ("article",), paragraphs[1:]),
+    assert [
+        source_id for paragraph in sections[0].paragraphs for source_id in paragraph.source_line_ids
+    ] == [
+        "p1:1",
+        "p1:2",
     ]
 
-    sections = apply_section_policy(drafts, max_section_chars=20)
 
-    assert [section.title for section in sections] == [
-        "Amendment I",
-        "Article I (Part 1)",
-        "Article I (Part 2)",
+def test_outline_boundaries_are_retained_without_reordering_source() -> None:
+    lines = [
+        line("p1:1", "First source paragraph.", page=1),
+        line("p2:1", "Second source paragraph.", page=2),
+    ]
+
+    sections = reconstruct_document(lines, [("Opening", 1), ("Next", 2)])
+
+    assert [(section.title, section.boundary_source) for section in sections] == [
+        ("Opening", "outline"),
+        ("Next", "outline"),
     ]
     assert [paragraph.text for section in sections for paragraph in section.paragraphs] == [
-        paragraph.text for paragraph in paragraphs
+        "First source paragraph.",
+        "Second source paragraph.",
     ]
-    assert sections[2].source_line_ids == ()
 
 
-def test_document_map_marks_omitted_sections() -> None:
-    fixture = Path("var/spikes/m1-t02/constitution.pdf")
-    if not fixture.exists():
-        pytest.skip("selected PDF fixture is not available")
+def test_nested_outline_titles_sharing_a_page_are_flattened_without_loss() -> None:
+    lines = [
+        line("p1:1", "First source paragraph.", page=1),
+        line("p2:1", "Second source paragraph.", page=2),
+    ]
 
-    document = process_selected_pdf(fixture)
-
-    assert len(document.document_map) == DOCUMENT_MAP_MAX_ENTRIES + 1
-    assert document.document_map[-1].omitted_sections == (
-        len(document.sections) - DOCUMENT_MAP_MAX_ENTRIES
+    sections = reconstruct_document(
+        lines,
+        [("Chapter one", 1), ("Scope", 1), ("Chapter two", 2)],
     )
-    assert document.document_map[-1].title.endswith("section titles omitted]")
+
+    assert [section.title for section in sections] == [
+        "Chapter one — Scope",
+        "Chapter two",
+    ]
+    assert [paragraph.text for section in sections for paragraph in section.paragraphs] == [
+        "First source paragraph.",
+        "Second source paragraph.",
+    ]
 
 
-def test_selected_pdf_is_lossless_ordered_and_signature_safe() -> None:
-    fixture = Path("var/spikes/m1-t02/constitution.pdf")
-    if not fixture.exists():
-        pytest.skip("selected PDF fixture is not available")
+def test_committed_constitution_regression_fixture_is_processed_without_identity_policy() -> None:
+    document = process_pdf(Path(__file__).parent / "fixtures" / "constitution.pdf")
 
-    document = process_selected_pdf(fixture)
     paragraphs = canonical_paragraphs(document)
     text = "\n\n".join(paragraph.text for paragraph in paragraphs)
-
-    assert document.source_sha256 == (
-        "4d85f1cbfcb9789f10bf306e379e97ff150ea235249190a188b0c05923fd6f19"
-    )
-    assert len(document.sections) == 37
-    # The spike's 154 raw reconstructed paragraphs become 155 after the
-    # architecture's 2,000-character, sentence-aware paragraph limit.
-    assert len(paragraphs) == 155
+    assert document.sections
+    assert paragraphs
     assert [paragraph.order for paragraph in paragraphs] == list(range(1, len(paragraphs) + 1))
-    assert [section.first_paragraph_order for section in document.sections] == [
-        section.paragraphs[0].order for section in document.sections
-    ]
+    assert document.document_map
+    # The signature page has two upper text blocks followed by two signer columns.
+    # Its semantic reading order is intentionally not raw y/x extraction order.
     assert text.index("done in Convention") < text.index("The Word, “the,” being interlined")
-    assert (
-        text.index("The Word, “the,” being interlined")
-        < text.index("DELAWARE")
-        < text.index("NEW HAMPSHIRE")
-    )
+    assert text.index("The Word, “the,” being interlined") < text.index("DELAWARE")
+    assert text.index("DELAWARE") < text.index("NEW HAMPSHIRE")
     assert "interlined between in Convention" not in text
     assert "Sep-Page" not in text
 
 
-def test_unsupported_checksum_fails_clearly(tmp_path: Path) -> None:
-    candidate = tmp_path / "other.pdf"
-    candidate.write_bytes(b"not the selected pdf")
+@pytest.mark.parametrize(
+    ("name", "boundary_source"),
+    [("text-with-outline.pdf", "outline"), ("text-without-outline.pdf", "fallback")],
+)
+def test_text_pdf_fixtures_are_lossless_and_ordered(name: str, boundary_source: str) -> None:
+    document = process_pdf(Path(__file__).parent / "fixtures" / name)
 
-    with pytest.raises(PdfProcessingError, match="checksum"):
-        process_selected_pdf(candidate)
+    paragraphs = canonical_paragraphs(document)
+    assert paragraphs
+    assert any(section.boundary_source == boundary_source for section in document.sections)
+    assert [paragraph.order for paragraph in paragraphs] == list(range(1, len(paragraphs) + 1))
+    assert len({paragraph.text for paragraph in paragraphs}) == len(paragraphs)
+
+
+def test_image_only_fixture_is_rejected_without_partial_text() -> None:
+    with pytest.raises(PdfProcessingError, match="no extractable text"):
+        process_pdf(Path(__file__).parent / "fixtures" / "image-only.pdf")
+
+
+def test_encrypted_fixture_is_rejected_with_an_actionable_error() -> None:
+    with pytest.raises(PdfProcessingError, match="encrypted"):
+        process_pdf(Path(__file__).parent / "fixtures" / "encrypted-text.pdf")
+
+
+def test_malformed_pdf_has_a_plain_language_failure(tmp_path: Path) -> None:
+    candidate = tmp_path / "malformed.pdf"
+    candidate.write_bytes(b"%PDF-1.7 malformed")
+
+    with pytest.raises(PdfProcessingError, match="could not be opened"):
+        process_pdf(candidate)
 
 
 def test_hyphen_normalization_preserves_lexical_hyphens() -> None:
     assert join_lines(["Govern-", "ment"]) == "Government"
     assert join_lines(["Vice- President"]) == "Vice- President"
     assert join_lines(["https://example.org/a-", "path"]) == "https://example.org/a-path"
+
+
+def test_heading_sections_require_substantial_content_after_consistent_candidates() -> None:
+    body = "Readable body text. " * 60
+    lines = [
+        line("heading-1", "First heading", top=50, font_size=18.0),
+        line("body-1", body, top=90),
+        line("heading-2", "Second heading", top=200, font_size=18.0),
+        line("body-2", body, top=240),
+    ]
+
+    sections = reconstruct_document(lines, [])
+
+    assert [section.boundary_source for section in sections] == ["heading", "heading"]
+    assert [section.title for section in sections] == ["First heading", "Second heading"]
+
+
+def test_short_or_running_heading_candidates_use_fallback_sections() -> None:
+    lines = [
+        line("heading-1", "First heading", top=50, font_size=18.0),
+        line("body-1", "Short body.", top=90),
+        line("heading-2", "Second heading", top=200, font_size=18.0),
+        line("body-2", "Another short body.", top=240),
+    ]
+
+    sections = reconstruct_document(lines, [])
+
+    assert [section.boundary_source for section in sections] == ["fallback"]
