@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 
+from margin_api import document_uploads
 from margin_api.config import get_settings
 from margin_api.database import create_session_factory
 from margin_api.document_uploads import create_processing_document, process_document
@@ -56,6 +57,31 @@ def test_processing_failure_leaves_no_authoritative_derived_rows(tmp_path: Path)
         assert session.scalar(select(func.count()).select_from(Section)) == 0
         assert session.scalar(select(func.count()).select_from(Paragraph)) == 0
         assert str(tmp_path) not in (persisted.failure_message or "")
+
+
+def test_publication_failure_leaves_document_retryable_without_derived_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    factory = _factory(tmp_path)
+    source = (Path(__file__).parent / "fixtures" / "constitution.pdf").read_bytes()
+    document = create_processing_document(factory, tmp_path / "data", source)
+
+    def fail_publication(*_: object) -> None:
+        raise RuntimeError("database write failed")
+
+    monkeypatch.setattr(document_uploads, "_publish_processed_document", fail_publication)
+    process_document(factory, document.id)
+
+    with factory() as session:
+        persisted = session.get(Document, document.id)
+        assert persisted is not None
+        assert persisted.status == "failed"
+        assert persisted.failure_code == "document_publication_failed"
+        assert persisted.failure_message == "The prepared PDF could not be saved. Please try again."
+        assert persisted.current_paragraph_id is None
+        assert persisted.document_map == []
+        assert session.scalar(select(func.count()).select_from(Section)) == 0
+        assert session.scalar(select(func.count()).select_from(Paragraph)) == 0
 
 
 def test_invalid_upload_is_rejected_before_a_document_is_created(tmp_path: Path) -> None:
