@@ -10,7 +10,8 @@ The roadmap translates the product thesis and V0 RFC into measurable engineering
 
 - Build vertical slices that can be demonstrated end to end.
 - Treat the current paragraph as the reading-position anchor, not as the limit of model context.
-- Validate the conversational experience before broadening document support.
+- Establish trustworthy processing for text-based PDFs before evaluating the conversational
+  experience.
 - Keep context explicit, bounded, inspectable, and grounded in the uploaded document.
 - Add infrastructure only when it solves a current V0 requirement.
 - Use one active implementation ticket at a time unless work is demonstrably independent.
@@ -81,16 +82,18 @@ M0-T08 adds deterministic start and flat section navigation; richer navigation r
 
 ### M2 — Simple end-to-end conversational-reading prototype
 
-**Status:** Ready to begin with `M2-T01`; later tickets remain dependency-gated in `TASKS.md`.
+**Status:** `M2-T02A` is Ready; later reader and conversation tickets remain dependency-gated in
+`TASKS.md`.
 
-**Outcome:** A user can upload the selected supported PDF, listen linearly from the beginning,
+**Outcome:** A user can upload a supported text-based PDF, listen linearly from the beginning,
 pause at a paragraph, ask spoken questions and follow-ups, hear spoken answers, continue reading,
 and later begin a new anchored conversation that retains every earlier discussion from the active
 reading session.
 
 **Exit criteria:**
 
-- Upload and processing states are visible, and unsupported or non-extractable PDFs fail clearly.
+- Upload and processing states are visible. Text-based PDFs are not limited to a selected
+  benchmark fixture; image-only, encrypted, malformed, or non-extractable PDFs fail clearly.
 - Deterministic processing persists a bounded document map plus ordered sections and paragraphs
   without omitting, duplicating, overlapping, or reordering retained source text.
 - Narration begins at the first paragraph, displays the active paragraph, generates versioned

@@ -965,7 +965,9 @@ The application foundation has a documented, repeatable verification procedure a
 - Update `AGENTS.md` with the final commands and conventions.
 - Reconcile M1 completion against every exit criterion in `ROADMAP.md`.
 - Document the deliberately narrow M2 prototype boundary, decompose it into the six ordered tickets
-  below using the completed M1 evidence, and move only M2-T01 to `Ready`.
+  below using the completed M1 evidence, and move only M2-T01 to `Ready`. A later M2 human
+  checkpoint may add a dependency-gating ticket when product evidence shows that a prerequisite
+  was too narrow.
 - Preserve the deferred reader, navigation, context-expansion, hardening, and dogfooding ideas as
   outcome-level M3 and M4 plans rather than decomposing them speculatively.
 
@@ -987,8 +989,10 @@ The application foundation has a documented, repeatable verification procedure a
 - Authoritative configuration documents the initial recording, context-budget, answer-reserve,
   safety-margin, model/voice, and audio-cache inputs established by the spikes.
 - M1 exit criteria in `ROADMAP.md` are satisfied.
-- M2 has six ordered, dependency-aware tickets based on evidence rather than speculative
-  implementation detail; only M2-T01 is `Ready`.
+- At M1 completion, M2 had six ordered, dependency-aware tickets based on evidence rather than
+  speculative implementation detail, and only M2-T01 was `Ready`. The M2-T02 human checkpoint
+  subsequently added M2-T02A to make general text-PDF processing an explicit gate before reader
+  work.
 - M3 and M4 retain the deferred V0 ideas at outcome level for evidence-based review after the
   preceding milestone.
 
@@ -1004,7 +1008,7 @@ The application foundation has a documented, repeatable verification procedure a
 
 M2 is the narrowest useful vertical slice of Margin's defining interaction. It uses the completed
 M1 extraction, recording, reasoning, TTS, persistence, and same-origin evidence to let one user
-upload the selected supported PDF, listen linearly from the beginning, pause, hold a grounded
+upload a supported text-based PDF, listen linearly from the beginning, pause, hold a grounded
 spoken conversation, continue, and later ask a new question that retains every earlier discussion
 from the active reading session.
 
@@ -1080,14 +1084,14 @@ sections and paragraphs suitable for persistence and reader navigation.
 - **Not available yet:** A human cannot upload or listen to the PDF through the product after this
   ticket alone.
 
-## M2-T02 — Upload and persist one supported PDF
+## M2-T02 — Upload and persist the selected benchmark PDF
 
 **Status:** Done
 **Depends on:** M2-T01
 
 ### Outcome
 
-A user can upload the supported PDF in the browser, see its preparation result, and receive one
+A user can upload the selected benchmark PDF in the browser, see its preparation result, and receive one
 atomically persisted document backed by the ordered output from M2-T01.
 
 ### Scope
@@ -1123,8 +1127,9 @@ atomically persisted document backed by the ordered output from M2-T01.
 
 ### Human checkpoint
 
-- **Project state:** The selected PDF can enter the product and become a saved, prepared document;
-  it still cannot be read aloud or discussed.
+- **Project state:** The selected benchmark PDF can enter the product and become a saved, prepared
+  document; it still cannot be read aloud or discussed. This was a fixture-only foundation;
+  `M2-T02A` is required before the product can claim general text-PDF upload support.
 - **What was accomplished:** A browser upload now reaches FastAPI, shows preparation progress, and
   either publishes one complete readable document or shows a clear failure.
 - **What to inspect:** Upload the supported PDF and watch the submitting, processing, and ready
@@ -1138,10 +1143,104 @@ atomically persisted document backed by the ordered output from M2-T01.
 - **Not available yet:** Play, Pause, narration, Ask, follow-ups, and Continue are not expected to
   work.
 
+## M2-T02A — Generalize upload and processing to text-based PDFs
+
+**Status:** Ready
+**Depends on:** M2-T01, M2-T02
+
+### Outcome
+
+A user can upload any PDF with extractable text within the configured size limit—not only the
+development benchmark—and receive one atomically persisted, readable document. The Constitution
+fixture remains a regression fixture and evaluation document, never an upload allowlist.
+
+### Scope
+
+- Remove the checksum- or fixture-identity upload policy. Accept PDF bytes through the existing
+  same-origin multipart route subject only to the configured size limit and PDF-format validation.
+- Generalize deterministic metadata, outline, layout, paragraph, section, fallback-section, and
+  bounded-document-map processing from M2-T01 to text-based PDFs. Preserve every retained
+  paragraph exactly once in canonical source order.
+- Use the architecture's layout-aware extraction rules for ordinary text PDFs with or without
+  usable outlines and headings. A document must not be accepted merely because it has a `.pdf`
+  filename.
+- Fail image-only, encrypted, malformed, and genuinely non-extractable PDFs with plain-language,
+  actionable errors. Do not introduce OCR or silently publish scrambled, partial, duplicated, or
+  reordered source text.
+- Keep the original uploaded PDF, status lifecycle, retry behavior, source ownership, atomic
+  derived-row publication, and initial reading-position behavior from M2-T02.
+- Replace fixture-only UI language with language that accurately describes supported text-based
+  PDFs. Reset stale success or failure messaging when a user chooses a different file.
+- After preparation succeeds, provide a read-only prepared-source review view. It must let the
+  human inspect the stored document map and every normalized section and paragraph in canonical
+  order, including available page markers. For large documents, paginate or progressively load the
+  review view; it must still make all persisted normalized text inspectable without narration or a
+  reading session.
+- Add the narrow same-origin review API needed by that view. It returns persisted normalized source
+  records only after a document is ready and does not create a second parsing, navigation, or
+  reading-position model.
+- Add a small committed, legally usable PDF fixture suite covering at least: the existing benchmark,
+  a text PDF with a usable outline, a text PDF without a usable outline, and a non-extractable
+  input. Use each only for deterministic regression coverage, not input identity validation.
+
+### Out of scope
+
+- OCR, scanned/image-only PDF support, cloud document conversion, a document library, background
+  queues, model calls, reader controls, section navigation, and narration.
+
+### Acceptance criteria
+
+- A text-based PDF other than the Constitution fixture uploads, reaches visible preparation states,
+  and becomes ready with an ordered persisted hierarchy, bounded document map, and first paragraph
+  as its initial reading position.
+- The API has no checksum, filename, title, or fixture-identity allowlist. The Constitution remains
+  accepted as a regression case but is not treated specially at runtime.
+- Representative text PDFs with and without usable outlines produce canonical paragraph traversal
+  with no retained paragraph silently omitted, duplicated, overlapped, or reordered.
+- Image-only, encrypted, malformed, and non-extractable inputs fail in plain language without
+  partial authoritative rows, local paths, credentials, or technical extraction details.
+- Selecting a different file clears a previous document's ready or failed message before the new
+  preparation request, and browser requests remain same-origin `/api` only.
+- A ready document exposes a read-only review view with its bounded document map, all persisted
+  normalized sections and paragraphs in canonical source order, and available page markers. The
+  view does not start narration, create a reading session, or substitute for the M2-T03 reader.
+- A retry after a processing failure cannot expose partial derived data or duplicate rows.
+
+### Verification
+
+- Run deterministic parsing, normalization, and source-order tests over the committed fixture
+  suite, including the existing Constitution regression fixture.
+- Run upload, retry, and failure-cleanup API tests against temporary migrated databases.
+- Run focused upload-screen tests for a non-benchmark text-PDF success, non-extractable failure,
+  state reset after file selection, and prepared-source review ordering/pagination.
+- Run review API tests against a temporary migrated database, including rejection before a document
+  is ready and preservation of section, paragraph, and page-marker order.
+- Verify migration-backed persistence against a fresh database and perform a real-browser upload
+  of at least one non-benchmark text-based PDF.
+
+### Human checkpoint
+
+- **Project state:** Margin accepts text-based PDFs for preparation rather than pretending that one
+  development document is the product's only supported upload.
+- **What was accomplished:** A normal text PDF can become a saved, prepared document with ordered
+  paragraphs and a readable document map; a scan or otherwise non-extractable input fails clearly.
+- **What to inspect:** Upload the Constitution fixture and at least one different text-based PDF.
+  For both, confirm submitting, preparing, and ready states. Open the prepared-source review and
+  inspect the document map, headings, page markers, and paragraphs against the original PDF. Then
+  upload an image-only or malformed PDF and confirm the message says what the user can do without
+  exposing implementation details.
+- **Evidence to request:** Browser walkthroughs for both successful PDFs and one failure, fixture
+  suite and source-order test results, review API and temporary-database results, and proof that
+  the upload route contains no document-identity allowlist.
+- **Feedback needed:** Confirm that “text-based PDF” is understandable and that the failure wording
+  explains the limitation without falsely implying that only a product demo document is allowed.
+- **Not available yet:** Play, Pause, narration, Ask, follow-ups, and Continue are not expected to
+  work.
+
 ## M2-T03 — Deliver linear listening from the document beginning
 
 **Status:** Backlog
-**Depends on:** M2-T02
+**Depends on:** M2-T02A
 
 ### Outcome
 

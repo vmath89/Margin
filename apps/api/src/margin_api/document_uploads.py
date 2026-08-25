@@ -68,7 +68,15 @@ def process_document(session_factory: sessionmaker[Session], document_id: str) -
         )
         return
 
-    _publish_processed_document(session_factory, document_id, processed)
+    try:
+        _publish_processed_document(session_factory, document_id, processed)
+    except Exception:
+        _mark_failed(
+            session_factory,
+            document_id,
+            "document_publication_failed",
+            "The prepared PDF could not be saved. Please try again.",
+        )
 
 
 def retry_document(session_factory: sessionmaker[Session], document_id: str) -> Document:
