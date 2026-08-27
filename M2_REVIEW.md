@@ -63,15 +63,17 @@ invent historical observations solely to populate this file.
 
 ## M2-T02A — General text-PDF upload and prepared-source review
 
-Implementation status: In Progress
-Reviewed commit:
-Review date:
-Reviewer:
-Decision: Pending
+Implementation status: Done
+Reviewed commit: 0a3355be748af0f04e6541b712362ce4b53cf9f2
+Review date: 2026-08-27
+Reviewer: Project owner, with Codex verification evidence
+Decision: Accepted by one-time owner waiver
 
 ### Start procedure
 
-To be recorded by the implementation handoff using the canonical commands in `DEVELOPMENT.md`.
+From the repository root, install the locked backend and frontend dependencies, migrate a fresh
+SQLite database, start FastAPI on port 8000, start Next.js on port 3000, and open the web origin at
+`http://127.0.0.1:3000`. The exact canonical commands remain in `DEVELOPMENT.md`.
 
 ### Happy-path walkthrough
 
@@ -91,11 +93,27 @@ authoritative data, secret, local path, or stale status.
 
 ### Actual observations
 
-Pending.
+Codex uploaded the committed non-benchmark outline fixture through the real browser UI. It moved
+through the visible preparation flow, became ready as `Opening`, and exposed a prepared-source
+review whose document map was `Opening` then `Conclusion`; sections retained pages 1 and 2; and
+five paragraphs appeared once in canonical order with their page markers. Codex then selected the
+image-only fixture: selection immediately cleared the prior ready message and prepared-source
+view, and preparation failed with the actionable no-extractable-text message without exposing a
+path or technical detail. The committed Constitution fixture, no-outline fixture, encrypted
+fixture, malformed input, pagination, stale asynchronous review response, retry, and source-order
+cases were exercised by automated tests.
 
 ### Automated verification and results
 
-Pending.
+- `apps/api/.venv/bin/pytest apps/api/tests` — 57 passed on 2026-08-27.
+- `apps/api/.venv/bin/ruff check apps/api` — passed.
+- `apps/api/.venv/bin/mypy apps/api/src` — passed with no issues in 9 source files.
+- `apps/web/node_modules/.bin/vitest run` — 8 passed.
+- `apps/web/node_modules/.bin/eslint .` — passed.
+- `apps/web/node_modules/.bin/tsc --noEmit` — passed.
+- A fresh SQLite database migrated through revisions `20260823_01` and `20260823_02`.
+- Real-browser same-origin non-benchmark success, prepared-source inspection, state reset, and
+  image-only failure checks passed on 2026-08-25.
 
 ### Known limitations
 
@@ -103,11 +121,15 @@ No narration or conversation. The broader supported-layout decision belongs to M
 
 ### Required corrections or follow-up tickets
 
-Pending.
+No correction remains from the independent code review. The project owner explicitly waived the
+remaining personal hands-on walkthrough on 2026-08-27 and accepted the ticket using the recorded
+automated and Codex-operated browser evidence. This is a one-ticket waiver; it does not change the
+human-review requirement for later M2 tickets. M2-T02B remains responsible for defining and
+validating the broader supported-layout envelope.
 
 ## M2-T02B — Supported text-PDF compatibility gate
 
-Implementation status: Backlog
+Implementation status: Ready
 Reviewed commit:
 Review date:
 Reviewer:

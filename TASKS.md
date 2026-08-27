@@ -1163,7 +1163,7 @@ atomically persisted document backed by the ordered output from M2-T01.
 
 ## M2-T02A — Generalize upload and processing to text-based PDFs
 
-**Status:** In Progress
+**Status:** Done
 **Depends on:** M2-T01, M2-T02
 
 ### Outcome
@@ -1262,7 +1262,7 @@ allowlist.
 
 ## M2-T02B — Define and validate the supported text-PDF envelope
 
-**Status:** Backlog
+**Status:** Ready
 **Depends on:** M2-T02A
 
 ### Outcome

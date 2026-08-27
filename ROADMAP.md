@@ -82,8 +82,8 @@ M0-T08 adds deterministic start and flat section navigation; richer navigation r
 
 ### M2 — Simple end-to-end conversational-reading prototype
 
-**Status:** `M2-T02A` is In Progress; later reader and conversation tickets remain dependency-gated
-in `TASKS.md`.
+**Status:** `M2-T02A` is Done and `M2-T02B` is Ready; later reader and conversation tickets remain
+dependency-gated in `TASKS.md`.
 
 **Outcome:** A user can upload a supported, primarily linear text-based PDF within the configured
 limits, listen linearly from the beginning, pause at a paragraph, ask spoken questions and
