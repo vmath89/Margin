@@ -61,6 +61,7 @@ class Settings(BaseSettings):
 
     max_recording_seconds: PositiveInt = 120
     max_question_characters: PositiveInt = 2_000
+    max_extracted_document_characters: PositiveInt = 1_000_000
     context_budget_mode: Literal["token", "character"] = "token"
     model_context_limit: PositiveInt = 128_000
     reserved_answer_tokens: PositiveInt = 4_096

@@ -12,7 +12,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from margin_api.errors import ApiError
 from margin_api.models import Document, Paragraph, Section
-from margin_api.pdf_processing import PdfProcessingError, ProcessedDocument, process_pdf
+from margin_api.pdf_processing import (
+    MAX_DOCUMENT_CHARS,
+    PdfProcessingError,
+    ProcessedDocument,
+    process_pdf,
+)
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
@@ -45,7 +50,12 @@ def create_processing_document(
     return document
 
 
-def process_document(session_factory: sessionmaker[Session], document_id: str) -> None:
+def process_document(
+    session_factory: sessionmaker[Session],
+    document_id: str,
+    *,
+    max_document_characters: int = MAX_DOCUMENT_CHARS,
+) -> None:
     """Process source text outside a transaction, then publish its hierarchy atomically."""
 
     with session_factory() as session:
@@ -55,7 +65,9 @@ def process_document(session_factory: sessionmaker[Session], document_id: str) -
         source_path = Path(document.source_path)
 
     try:
-        processed = process_pdf(source_path)
+        processed = process_pdf(
+            source_path, max_document_characters=max_document_characters
+        )
     except PdfProcessingError as error:
         _mark_failed(session_factory, document_id, "pdf_processing_failed", str(error))
         return

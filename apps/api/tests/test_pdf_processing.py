@@ -86,6 +86,21 @@ def test_nested_outline_titles_sharing_a_page_are_flattened_without_loss() -> No
     ]
 
 
+def test_partial_outline_falls_back_to_consistent_headings() -> None:
+    body = "Readable body text. " * 60
+    lines = [
+        line("heading-1", "First heading", top=50, font_size=18.0),
+        line("body-1", body, top=90),
+        line("heading-2", "Second heading", top=200, font_size=18.0),
+        line("body-2", body, top=240),
+    ]
+
+    sections = reconstruct_document(lines, [("Incidental bookmark", 1)])
+
+    assert [section.title for section in sections] == ["First heading", "Second heading"]
+    assert [section.boundary_source for section in sections] == ["heading", "heading"]
+
+
 def test_committed_constitution_regression_fixture_is_processed_without_identity_policy() -> None:
     document = process_pdf(Path(__file__).parent / "fixtures" / "constitution.pdf")
 
@@ -134,6 +149,13 @@ def test_malformed_pdf_has_a_plain_language_failure(tmp_path: Path) -> None:
 
     with pytest.raises(PdfProcessingError, match="could not be opened"):
         process_pdf(candidate)
+
+
+def test_extracted_document_text_over_configured_limit_is_rejected() -> None:
+    candidate = Path(__file__).parent / "fixtures" / "text-without-outline.pdf"
+
+    with pytest.raises(PdfProcessingError, match="configured limit"):
+        process_pdf(candidate, max_document_characters=20)
 
 
 def test_hyphen_normalization_preserves_lexical_hyphens() -> None:

@@ -14,6 +14,7 @@ import pdfplumber
 from pypdf import PdfReader
 
 MAX_PARAGRAPH_CHARS = 2_000
+MAX_DOCUMENT_CHARS = 1_000_000
 MIN_SECTION_CHARS = 1_000
 TARGET_SECTION_CHARS = 30_000
 MAX_SECTION_CHARS = 100_000
@@ -105,8 +106,12 @@ class _DraftSection:
     paragraphs: list[ProcessedParagraph]
 
 
-def process_pdf(pdf_path: Path) -> ProcessedDocument:
+def process_pdf(
+    pdf_path: Path, *, max_document_characters: int = MAX_DOCUMENT_CHARS
+) -> ProcessedDocument:
     """Process any readable, unencrypted PDF with extractable, ordered text."""
+    if max_document_characters <= 0:
+        raise ValueError("max_document_characters must be positive")
     try:
         source = pdf_path.read_bytes()
         reader = PdfReader(pdf_path)
@@ -130,6 +135,13 @@ def process_pdf(pdf_path: Path) -> ProcessedDocument:
         apply_section_policy(reconstruct_document(lines, _outline_entries(reader)))
     )
     _assert_invariants(lines, sections)
+    if sum(len(paragraph.text) for section in sections for paragraph in section.paragraphs) > (
+        max_document_characters
+    ):
+        raise PdfProcessingError(
+            "This PDF contains more text than the configured limit. "
+            "Choose a shorter text-based PDF."
+        )
     metadata: Any = reader.metadata or {}
     title = str(metadata.get("/Title") or "").strip() or sections[0].title
     author = str(metadata.get("/Author") or "").strip() or None
@@ -216,7 +228,7 @@ def reconstruct_document(
     lines: list[LayoutLine], outline: list[tuple[str, int]]
 ) -> list[_DraftSection]:
     headings = _heading_ids(lines)
-    outline_by_page = _flatten_outline_by_page(outline, lines[-1].page)
+    outline_by_page = _usable_outline_by_page(outline, lines[-1].page)
     boundaries: dict[str, tuple[str, BoundarySource]] = {}
     outlined_pages: set[int] = set()
     for line in lines:
@@ -295,6 +307,13 @@ def _flatten_outline_by_page(
         if title not in titles:
             titles.append(title)
     return {page: " — ".join(titles) for page, titles in titles_by_page.items()}
+
+
+def _usable_outline_by_page(outline: list[tuple[str, int]], last_page: int) -> dict[int, str]:
+    """Use outlines only when they define at least two distinct source ranges."""
+
+    outline_by_page = _flatten_outline_by_page(outline, last_page)
+    return outline_by_page if len(outline_by_page) >= 2 else {}
 
 
 def _heading_ids(lines: list[LayoutLine]) -> set[str]:

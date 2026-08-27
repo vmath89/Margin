@@ -10,6 +10,7 @@ from margin_api.errors import ConfigurationError
 def test_settings_use_spike_defaults_without_exposing_a_credential(tmp_path: Path) -> None:
     settings = Settings(_env_file=None, data_root=tmp_path)
 
+    assert settings.max_extracted_document_characters == 1_000_000
     assert settings.max_recording_seconds == 120
     assert settings.reasoning_model == "openai/gpt-5.6-sol"
     assert settings.audio_cache_version == "cac618e44368569c"

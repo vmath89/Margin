@@ -157,7 +157,12 @@ async def upload_document(
     document = create_processing_document(
         request.app.state.session_factory, request.app.state.settings.data_root, source
     )
-    background_tasks.add_task(process_document, request.app.state.session_factory, document.id)
+    background_tasks.add_task(
+        process_document,
+        request.app.state.session_factory,
+        document.id,
+        max_document_characters=request.app.state.settings.max_extracted_document_characters,
+    )
     return document_response(document)
 
 
@@ -228,5 +233,10 @@ async def retry_document_upload(
     request: Request, document_id: str, background_tasks: BackgroundTasks
 ) -> DocumentResponse:
     document = retry_document(request.app.state.session_factory, document_id)
-    background_tasks.add_task(process_document, request.app.state.session_factory, document.id)
+    background_tasks.add_task(
+        process_document,
+        request.app.state.session_factory,
+        document.id,
+        max_document_characters=request.app.state.settings.max_extracted_document_characters,
+    )
     return document_response(document)

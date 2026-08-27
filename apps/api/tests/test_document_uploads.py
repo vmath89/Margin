@@ -13,6 +13,7 @@ from margin_api.document_uploads import create_processing_document, process_docu
 from margin_api.errors import ApiError
 from margin_api.main import app
 from margin_api.models import Document, Paragraph, Section
+from margin_api.pdf_processing import process_pdf
 
 
 def test_selected_pdf_publishes_one_complete_ordered_hierarchy(tmp_path: Path) -> None:
@@ -106,6 +107,64 @@ def test_publication_failure_leaves_document_retryable_without_derived_rows(
         assert session.scalar(select(func.count()).select_from(Paragraph)) == 0
 
 
+def test_retry_api_replaces_failed_publication_without_duplicate_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database_path = tmp_path / "api.db"
+    factory = _factory(tmp_path, database_path)
+    data_root = tmp_path / "data"
+    source_path = Path(__file__).parent / "fixtures" / "text-with-outline.pdf"
+    source = source_path.read_bytes()
+    expected = process_pdf(source_path)
+    real_publish = document_uploads._publish_processed_document
+    publication_attempts = 0
+
+    def fail_first_publication(*args: object) -> None:
+        nonlocal publication_attempts
+        publication_attempts += 1
+        if publication_attempts == 1:
+            raise RuntimeError("transient database write failure")
+        real_publish(*args)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(document_uploads, "_publish_processed_document", fail_first_publication)
+    monkeypatch.setenv("MARGIN_DATABASE_URL", f"sqlite:///{database_path}")
+    monkeypatch.setenv("MARGIN_DATA_ROOT", str(data_root))
+    get_settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            upload = client.post("/api/documents", files={"file": ("paper.pdf", source)})
+            document_id = upload.json()["id"]
+            failed = client.get(f"/api/documents/{document_id}")
+            retried = client.post(f"/api/documents/{document_id}/retry")
+            ready = client.get(f"/api/documents/{document_id}")
+    finally:
+        get_settings.cache_clear()
+
+    assert upload.status_code == retried.status_code == 202
+    assert failed.json()["status"] == "failed"
+    assert retried.json()["status"] == "processing"
+    assert ready.json()["status"] == "ready"
+    assert publication_attempts == 2
+    with factory() as session:
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(Section)
+                .where(Section.document_id == document_id)
+            )
+            == len(expected.sections)
+        )
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(Paragraph)
+                .join(Section)
+                .where(Section.document_id == document_id)
+            )
+            == len(expected.paragraphs)
+        )
+
+
 def test_invalid_upload_is_rejected_before_a_document_is_created(tmp_path: Path) -> None:
     factory = _factory(tmp_path)
 
@@ -186,6 +245,34 @@ def test_upload_api_accepts_a_non_benchmark_text_pdf(
         get_settings.cache_clear()
 
     assert status_response.json()["status"] == "ready"
+
+
+def test_upload_api_enforces_configured_extracted_text_limit_without_partial_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database_path = tmp_path / "api.db"
+    factory = _factory(tmp_path, database_path)
+    monkeypatch.setenv("MARGIN_DATABASE_URL", f"sqlite:///{database_path}")
+    monkeypatch.setenv("MARGIN_DATA_ROOT", str(tmp_path / "data"))
+    monkeypatch.setenv("MARGIN_MAX_EXTRACTED_DOCUMENT_CHARACTERS", "20")
+    get_settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            source = (Path(__file__).parent / "fixtures" / "text-without-outline.pdf").read_bytes()
+            upload = client.post("/api/documents", files={"file": ("paper.pdf", source)})
+            document_id = upload.json()["id"]
+            status = client.get(f"/api/documents/{document_id}")
+    finally:
+        get_settings.cache_clear()
+
+    assert status.json()["status"] == "failed"
+    assert status.json()["failure_message"] == (
+        "This PDF contains more text than the configured limit. "
+        "Choose a shorter text-based PDF."
+    )
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(Section)) == 0
+        assert session.scalar(select(func.count()).select_from(Paragraph)) == 0
 
 
 def test_review_api_is_ready_only_and_preserves_pagination_order(

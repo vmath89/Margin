@@ -53,9 +53,13 @@ export default function HomePage() {
   }
   async function loadReview(offset = 0) {
     if (!documentId) return;
+    const generation = preparationGeneration.current;
     const response = await fetch(`/api/documents/${documentId}/review?offset=${offset}&limit=100`);
+    if (generation !== preparationGeneration.current) return;
     if (!response.ok) { const error = (await response.json()) as ErrorResponse; setMessage(error.message ?? "The prepared source could not be loaded."); return; }
-    setReview((await response.json()) as Review);
+    const preparedSource = (await response.json()) as Review;
+    if (generation !== preparationGeneration.current) return;
+    setReview(preparedSource);
   }
   return <main className="shell"><p className="eyebrow">Margin</p><h1>Stay with difficult ideas.</h1><p className="lede">Upload a text-based PDF to prepare it for reading. Scans and password-protected PDFs are not supported.</p><form className="upload-form" onSubmit={submitUpload}><label htmlFor="document">Text-based PDF</label><input id="document" name="document" type="file" accept="application/pdf,.pdf" onChange={chooseFile}/><button className="retry" disabled={state === "submitting" || state === "processing"}>{state === "submitting" ? "Uploading…" : "Prepare document"}</button></form><p className="status" role="status">{message}</p>{state === "ready" && <button className="review-button" onClick={() => loadReview()}>Review prepared source</button>}{review && <section className="review" aria-label="Prepared source"><h2>Prepared source</h2><h3>Document map</h3><ol>{review.document_map.map((entry, index) => <li key={index}>{entry.title}</li>)}</ol><h3>Sections</h3><ol>{review.sections.map((section) => <li key={section.id}>{section.title}{section.start_page ? ` (pages ${section.start_page}${section.end_page && section.end_page !== section.start_page ? `–${section.end_page}` : ""})` : ""}</li>)}</ol><h3>Paragraphs</h3>{review.paragraphs.map((paragraph) => <article key={paragraph.id}><small>Paragraph {paragraph.order}{paragraph.start_page ? ` · page ${paragraph.start_page}${paragraph.end_page && paragraph.end_page !== paragraph.start_page ? `–${paragraph.end_page}` : ""}` : ""}</small><p>{paragraph.text}</p></article>)}<div className="review-controls">{review.offset > 0 && <button onClick={() => loadReview(Math.max(0, review.offset - review.limit))}>Previous</button>}{review.offset + review.paragraphs.length < review.total_paragraphs && <button onClick={() => loadReview(review.offset + review.limit)}>Next</button>}</div></section>}</main>;
 }

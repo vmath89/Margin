@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import HomePage from "./page";
@@ -87,5 +87,41 @@ describe("HomePage", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Choose a text-based PDF"));
     expect(screen.queryByText("Old document is ready to inspect.")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Review prepared source" })).not.toBeInTheDocument();
+  });
+
+  it("does not restore an earlier prepared-source review after another file is selected", async () => {
+    let resolveReview: ((response: Response) => void) | undefined;
+    const reviewResponse = new Promise<Response>((resolve) => { resolveReview = resolve; });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "old-document", status: "processing" }), { status: 202 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "old-document", status: "ready", title: "Old document", failure_message: null })))
+      .mockReturnValueOnce(reviewResponse);
+    vi.stubGlobal("fetch", fetchMock);
+    render(<HomePage />);
+    const input = screen.getByLabelText("Text-based PDF");
+    const first = new File(["%PDF-1.7"], "first.pdf", { type: "application/pdf" });
+    const second = new File(["%PDF-1.7"], "second.pdf", { type: "application/pdf" });
+
+    fireEvent.change(input, { target: { files: [first] } });
+    fireEvent.click(screen.getByRole("button", { name: "Prepare document" }));
+    await screen.findByText("Old document is ready to inspect.");
+    fireEvent.click(screen.getByRole("button", { name: "Review prepared source" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    fireEvent.change(input, { target: { files: [second] } });
+    await act(async () => {
+      resolveReview?.(new Response(JSON.stringify({
+        document_map: [{ title: "Old section" }],
+        sections: [],
+        paragraphs: [],
+        offset: 0,
+        limit: 100,
+        total_paragraphs: 0,
+      })));
+      await reviewResponse;
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent("Choose a text-based PDF");
+    expect(screen.queryByRole("region", { name: "Prepared source" })).not.toBeInTheDocument();
   });
 });
